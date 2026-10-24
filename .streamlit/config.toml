@@ -1,0 +1,72 @@
+# Look and feel of the demo. Safe to commit: no secrets here.
+# Brand: Demo's warm palette — brown on white with beige surfaces (light) and on espresso (dark).
+# Button colours are deep enough that white text on them passes WCAG AA (≥ 4.5:1).
+
+[client]
+toolbarMode = "viewer"          # hides Deploy / developer buttons
+showSidebarNavigation = false   # the sidebar menu is drawn by app/ui/layout.py instead
+
+[server]
+maxUploadSize = 15              # MB; matches the importer's own limit
+
+[theme]
+# Headings use Fraunces, a warm old-style serif that suits the brown palette; body text and tables use IBM Plex Sans,
+# which stays easy to read at small sizes and in numbers.
+font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap, sans-serif"
+headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap, serif"
+codeFont = "'IBM Plex Mono':https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap, monospace"
+baseFontSize = 15
+headingFontSizes = ["2.05rem", "1.45rem", "1.18rem", "1.04rem"]
+headingFontWeights = [600, 600, 500, 500]
+metricValueFontSize = "1.9rem"
+baseRadius = "0.6rem"
+buttonRadius = "0.5rem"
+showWidgetBorder = true
+showSidebarBorder = true
+paddingTop = "1.5rem"
+
+[theme.light]
+primaryColor = "#7A4A26"   # saddle brown; white text on it ≈ 7.6:1
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F7F0E6"   # beige
+textColor = "#2B1C10"   # dark enough that faded captions still pass WCAG AA (≥ 4.5:1)
+linkColor = "#7A4A26"
+borderColor = "#E6D8C4"
+dataframeBorderColor = "#EDE2D3"
+dataframeHeaderBackgroundColor = "#F7F0E6"
+# Streamlit's "blue" badges and accents become the brand brown, so every brand-coloured chip follows the theme.
+blueColor = "#8B5A2B"
+blueTextColor = "#6A3F1E"
+blueBackgroundColor = "#F2E6D6"
+# Badge / delta text colours darkened so each passes 4.5:1 on its tinted background (Streamlit's defaults don't).
+orangeTextColor = "#9A3D06"
+greenTextColor = "#2F5E2A"
+redTextColor = "#B42318"
+violetTextColor = "#5B34B5"
+yellowTextColor = "#7A4F00"
+# Categorical order: brand brown first, then teal for contrast; single-series charts use slot 1.
+chartCategoricalColors = ["#8B5A2B", "#2F7F7A", "#C2873C", "#5E7D4E", "#B5533C", "#6B5B95", "#3E6E8E", "#A88B6E"]
+
+[theme.light.sidebar]
+backgroundColor = "#F7F0E6"
+secondaryBackgroundColor = "#EFE3D2"
+borderColor = "#E6D8C4"
+
+[theme.dark]
+primaryColor = "#9A6236"   # white button text ≥ 4.5:1, still ≥ 3:1 against the espresso page
+backgroundColor = "#1B140F"
+secondaryBackgroundColor = "#2A2018"
+textColor = "#F3EADB"
+linkColor = "#E2B07E"
+borderColor = "#3D3026"
+dataframeBorderColor = "#3D3026"
+dataframeHeaderBackgroundColor = "#2A2018"
+blueColor = "#D29B65"
+blueTextColor = "#EBC297"
+blueBackgroundColor = "#4A3423"
+chartCategoricalColors = ["#D29B65", "#4FB0A8", "#E0B25E", "#8DB27A", "#E07A5F", "#A497D0", "#6FA3C4", "#C9B49D"]
+
+[theme.dark.sidebar]
+backgroundColor = "#140F0B"
+secondaryBackgroundColor = "#2A2018"
+borderColor = "#3D3026"
