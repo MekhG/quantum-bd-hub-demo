@@ -159,7 +159,7 @@ st.markdown(
     "- **Search:** the box at the top of every page finds leads, contacts and colleges by name, email, phone or "
     "AISHE code.\n"
     "- **Alerts (bell):** tasks handed to you, queries past the 1-day reply target, finished cadences.\n"
-    "- **On a phone:** the menu is behind » at the top left; search, alerts and **New** stay at the top.\n"
+    "- **On a phone:** the menu opens from » at the top; search, alerts, **New** and your name stay at the top.\n"
     "- **Lead record:** tick a lead on Leads → **Open lead record**, or follow *Open lead* from Today, search, "
     "alerts, Queries or Calendar. **All leads** takes you back."
 )

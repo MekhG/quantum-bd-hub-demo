@@ -1,4 +1,4 @@
-"""What the sidebar badges and the bell show: counts and in-app alerts for one person."""
+"""What the attention strip and the bell show: counts and in-app alerts for one person."""
 
 from __future__ import annotations
 

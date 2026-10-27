@@ -1,7 +1,7 @@
 """Quantum BD & Marketing Hub — portfolio demo entry point.
 
 Run locally with:  streamlit run streamlit_app.py
-This file makes sure today's demo data exists, lets the visitor pick a persona, draws the sidebar menu and then runs
+This file makes sure today's demo data exists, lets the visitor pick a persona, draws the top menu and command bar, then runs
 the chosen page from views/.
 """
 
@@ -30,10 +30,10 @@ import streamlit as st  # noqa: E402  (must come after the fix above)
 from app.config import is_demo  # noqa: E402
 from app.ui.common import authenticate  # noqa: E402
 from app.ui.edit_table import show_edit_flash  # noqa: E402
-from app.ui.layout import FAVICON, load_shell_counts, render_sidebar, top_bar  # noqa: E402
+from app.ui.layout import FAVICON, load_shell_counts, render_shell  # noqa: E402
 
 st.set_page_config(page_title="Demo BD Hub", page_icon=str(FAVICON), layout="wide",
-                   initial_sidebar_state="auto")  # open on laptops, tucked away on phones
+                   initial_sidebar_state="collapsed")  # the menu is at the top; there is no sidebar
 
 # Menu sections.
 SECTIONS: dict[str, list[st.Page]] = {
@@ -87,7 +87,17 @@ def _demo_data_ready(day: str) -> str:
     return day
 
 
-current = st.navigation(SECTIONS, position="hidden")
+def _has_visitor() -> bool:
+    # The welcome page (no persona picked yet) shows no menu: there is nothing to open until you pick one.
+    if not is_demo():
+        return True
+    from app.demo.personas import chosen_email
+
+    return chosen_email() is not None
+
+
+current = st.navigation(SECTIONS, position="top" if _has_visitor() else "hidden")
+st.session_state["_qa_page_icon"] = current.icon
 st.set_page_config(page_title=f"{current.title} · Demo BD Hub")
 if is_demo():
     from app.demo.refresh import today_ist
@@ -99,10 +109,9 @@ if is_demo() and user.role == "viewer" and current.title == "Today" and not st.s
     st.session_state["viewer_landed"] = True
     st.switch_page(SECTIONS["Overview"][2])
 counts = load_shell_counts(user.id, user.name)
-render_sidebar(SECTIONS, user, counts)
 if is_demo():
     st.html('<div class="qa-demo-banner"><b>Live demo</b> · Demo is a fictional company — every institution, person '
             'and number is made up. The data rebuilds daily, so try anything.</div>')
-top_bar(user, counts)
+render_shell(user, counts)
 show_edit_flash()  # result of the last save / log, shown at the top of whichever page is open
 current.run()

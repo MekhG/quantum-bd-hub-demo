@@ -81,12 +81,13 @@ CSS = """
 /* ---------- Chips ---------- */
 .qa-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .qa-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500;
-  line-height: 1.5; border-radius: 6px; padding: 1px 8px; white-space: nowrap; }
+  line-height: 1.5; border-radius: 999px; padding: 1px 10px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent); }
 .qa-chip .qa-dot { width: 7px; height: 7px; border-radius: 999px; flex: none; }
 .qa-chip.qa-strong { font-weight: 600; }
 
 /* ---------- Initials and tiles ---------- */
-.qa-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
+.qa-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
   color: #FFFFFF; font-weight: 600; flex: none; }
 .qa-tile { display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; flex: none; }
 
@@ -100,9 +101,17 @@ CSS = """
 .qa-stepper { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px;
   grid-template-columns: repeat(var(--qa-steps), minmax(0, 1fr)); }
 .qa-stepper li { display: flex; flex-direction: column; gap: 7px; font-size: 0.76rem; min-width: 0; }
-.qa-stepper .qa-bar { height: 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); }
-.qa-stepper .done .qa-bar { background: #7A4A26; }
-.qa-stepper .current .qa-bar { background: #C9A27E; }
+.qa-stepper { gap: 0; }
+.qa-stepper li { gap: 10px; }
+.qa-stepper .qa-bar { position: relative; height: 3px; margin-top: 7px;
+  background: color-mix(in srgb, currentColor 14%, transparent); }
+.qa-stepper .qa-bar::after { content: ""; position: absolute; left: 0; top: -6px; width: 15px; height: 15px;
+  border-radius: 999px; box-sizing: border-box; background: var(--qa-card, #FFFFFF);
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent); }
+.qa-stepper .done .qa-bar { background: #A9713F; }
+.qa-stepper .done .qa-bar::after { background: #7A4A26; border-color: #7A4A26; }
+.qa-stepper .current .qa-bar::after { background: #E2B07E; border: 3px solid #7A4A26; }
+.qa-stepper span { padding-right: 8px; }
 .qa-stepper .current span { font-weight: 700; }
 .qa-stepper .future span { color: color-mix(in srgb, currentColor 74%, transparent); }
 .qa-stepper span { line-height: 1.25; overflow-wrap: anywhere; }
@@ -112,7 +121,7 @@ CSS = """
 /* ---------- Progress ---------- */
 .qa-progress { height: 8px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent);
   overflow: hidden; }
-.qa-progress > div { height: 100%; background: #7A4A26; border-radius: 999px; }
+.qa-progress > div { height: 100%; background: linear-gradient(90deg, #A9713F, #7A4A26); border-radius: 999px; }
 
 /* ---------- Definition lists (record details) ---------- */
 .stHtml .qa-facts, .qa-facts { padding: 0 !important; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px 12px; margin: 0;
@@ -127,15 +136,56 @@ CSS = """
 .qa-feed li:last-child { border-bottom: 0; }
 
 /* ---------- Cards drawn by Streamlit containers (keyed so the selector is stable) ---------- */
-[class*="st-key-qa-card-"] { border-radius: 14px !important; }
-[class*="st-key-qa-card-late-"] { border-color: rgba(232, 89, 12, 0.55) !important;
-  background: rgba(232, 89, 12, 0.045); }
-[class*="st-key-qa-card-info-"] { border-color: rgba(139, 90, 43, 0.45) !important;
-  background: rgba(139, 90, 43, 0.05); }
-[class*="st-key-qa-actions-"] { padding-left: 56px; }
-@media (max-width: 640px) { [class*="st-key-qa-actions-"] { padding-left: 0; } }
-[class*="st-key-qa-topbar"] { padding-bottom: 0.4rem; margin-bottom: 0.4rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
+/* Studio look: borderless white cards floating on the cream canvas, a colour edge for the channel. */
+[class*="st-key-qa-card-"], [data-testid="stVerticalBlock"][class*="st-key-qa-card-"] {
+  border-radius: 18px !important; border-color: transparent !important; background: var(--qa-card, #FFFFFF);
+  box-shadow: 0 1px 2px rgba(43, 28, 16, 0.05), 0 8px 24px rgba(43, 28, 16, 0.07); }
+[class*="st-key-qa-card-late-"] { box-shadow: inset 0 3px 0 #D9822B, 0 8px 24px rgba(43, 28, 16, 0.07); }
+[class*="st-key-qa-card-info-"] { background: color-mix(in srgb, #8B5A2B 8%, var(--qa-card, #FFFFFF)); }
+[class*="st-key-qa-card-"][class*="-chemail-"], [class*="st-key-qa-card-"][class*="-chlinkedin-"] { border-left: 5px solid #8B5A2B !important; }
+[class*="st-key-qa-card-"][class*="-chphone-"] { border-left: 5px solid #139DA2 !important; }
+[class*="st-key-qa-card-"][class*="-chwhatsapp-"] { border-left: 5px solid #22A35A !important; }
+[class*="st-key-qa-card-"][class*="-chmeeting-"], [class*="st-key-qa-card-"][class*="-chdemo-"] { border-left: 5px solid #8B6CE8 !important; }
+[class*="st-key-qa-card-"][class*="-chtask-"], [class*="st-key-qa-card-"][class*="-chinternal-"],
+[class*="st-key-qa-card-"][class*="-chweb-"], [class*="st-key-qa-card-"][class*="-chother-"] { border-left: 5px solid #B8A691 !important; }
+[class*="st-key-qa-topbar"] { padding: 0.55rem 0.7rem; margin-bottom: 0.2rem; border-radius: 999px;
+  background: var(--qa-card, #FFFFFF); box-shadow: 0 1px 2px rgba(43, 28, 16, 0.05), 0 6px 18px rgba(43, 28, 16, 0.06); }
+[class*="st-key-qa-attention"] { margin: 0.1rem 0 0.6rem; }
+[class*="st-key-qa-attention"] a { border-radius: 999px; padding: 2px 12px !important;
+  background: color-mix(in srgb, #D9822B 12%, transparent); border: 1px solid color-mix(in srgb, #D9822B 35%, transparent); }
+.qa-eyebrow-ch { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: color-mix(in srgb, currentColor 70%, transparent); }
+
+/* Plain bordered boxes and metric tiles get the same floating white card look (keys come from _tag_boxes). */
+[class*="st-key-qa-box-"], [data-testid="stMetric"] {
+  border-radius: 18px !important; border-color: transparent !important; background: var(--qa-card, #FFFFFF);
+  box-shadow: 0 1px 2px rgba(43, 28, 16, 0.05), 0 8px 24px rgba(43, 28, 16, 0.07); }
+[data-testid="stMetric"] { padding: 14px 18px !important; }
+[data-testid="stExpander"] details { border-radius: 16px; background: var(--qa-card, #FFFFFF); }
+
+/* Page banner */
+.qa-hero { display: flex; gap: 20px; align-items: center; padding: 22px 28px; margin: 0.2rem 0 0.8rem;
+  border-radius: 24px; background: linear-gradient(115deg, color-mix(in srgb, #C9A27E 30%, transparent),
+  color-mix(in srgb, #C9A27E 8%, transparent)); }
+.qa-hero-badge { flex: none; width: 58px; height: 58px; border-radius: 999px; background: #7A4A26; color: #FBF7F1;
+  display: inline-flex; align-items: center; justify-content: center; }
+.qa-ms { font-family: 'Material Symbols Rounded'; font-size: 30px; line-height: 1; font-weight: 400;
+  font-feature-settings: 'liga'; -webkit-font-feature-settings: 'liga'; letter-spacing: normal; }
+.qa-hero-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qa-hero-crumb { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: color-mix(in srgb, currentColor 72%, transparent); }
+.qa-hero .qa-hero-title, .stHtml h1.qa-hero-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2.05rem;
+  line-height: 1.12; margin: 0; padding: 0; }
+.qa-hero-sub { margin: 4px 0 0; font-size: 0.95rem; color: color-mix(in srgb, currentColor 78%, transparent); }
+@media (max-width: 640px) { .qa-hero { padding: 16px 18px; gap: 14px; } .qa-hero-badge { width: 44px; height: 44px; } }
+
+/* Every Streamlit heading in Fraunces (the theme's headingFont alone doesn't reach st.title / st.subheader). */
+[data-testid="stHeading"] h1, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3,
+[data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3,
+[data-testid="stMarkdownContainer"] h4 { font-family: 'Fraunces', Georgia, serif !important; font-weight: 600 !important; }
+
+/* On a phone the command bar wraps onto two rows: a rounded card instead of a pill. */
+@media (max-width: 640px) { [class*="st-key-qa-topbar"] { border-radius: 22px; } }
 
 /* Title sizing: Fraunces headings get slightly tighter letter spacing. */
 h1 { letter-spacing: 0.005em; }
@@ -144,14 +194,41 @@ h1 { letter-spacing: 0.005em; }
 .qa-demo-banner { font-size: 0.82rem; padding: 6px 12px; margin: -0.6rem 0 0.4rem; border-radius: 8px;
   background: color-mix(in srgb, #C9A27E 22%, transparent); border: 1px solid color-mix(in srgb, #8B5A2B 30%, transparent); }
 
-/* Sidebar user card */
+/* User card (in the person menu, top right) */
 .qa-user { display: flex; align-items: center; gap: 10px; }
 .qa-user b { display: block; font-weight: 600; }
 """
 
 
+def _tag_boxes() -> None:
+    """Streamlit gives a bordered st.container no attribute CSS can find, so every bordered container without a key
+    gets one ('qa-box-<n>', counted afresh on each run so it is the same from run to run) and the stylesheet can turn
+    it into a card. Installed once per process; containers with their own key are left alone."""
+    from streamlit.elements.layouts import LayoutsMixin
+
+    if getattr(LayoutsMixin, "_qa_tagged", False):
+        return
+    original = LayoutsMixin.container
+
+    def container(self, *, border=None, key=None, **kwargs):
+        if border and key is None:
+            n = st.session_state.get("_qa_box_seq", 0) + 1
+            st.session_state["_qa_box_seq"] = n
+            key = f"qa-box-{n}"
+        return original(self, border=border, key=key, **kwargs)
+
+    LayoutsMixin.container = container
+    LayoutsMixin._qa_tagged = True
+    st.container = st._main.container  # st.container was bound before the patch
+
+
 def inject_css() -> None:
-    st.html(f"<style>{CSS}</style>")
+    _tag_boxes()
+    st.session_state["_qa_box_seq"] = 0  # a fresh count for this run
+    # Cards are white on the cream page in light mode and a lifted espresso in dark mode.
+    dark = getattr(getattr(st.context, "theme", None), "type", "light") == "dark"
+    card_bg = "#261C15" if dark else "#FFFFFF"
+    st.html(f"<style>:root {{ --qa-card: {card_bg}; }}{CSS}</style>")
 
 
 def esc(text: object) -> str:
@@ -248,5 +325,6 @@ def html_block(markup: str) -> None:
 
 
 def card(key: str, tone: str = "plain"):
-    """A bordered container with a stable CSS hook. tone: plain / late (orange edge) / info (blue edge)."""
+    """A card container with a stable CSS hook. tone: plain / late (amber top edge) / info (tinted). A key holding
+    '-ch<channel>-' gets that channel's colour edge on the left."""
     return st.container(border=True, key=f"qa-card-{tone}-{key}")

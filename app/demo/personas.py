@@ -73,14 +73,18 @@ def welcome_page() -> None:
     author_url = get_setting("DEMO_AUTHOR_URL")
     repo_url = get_setting("DEMO_REPO_URL")
 
+    from app.ui.components import html_block, inject_css
+
+    inject_css()  # the same card and banner styles as inside the hub
     _, middle, _ = st.columns([0.6, 3, 0.6])
     with middle:
-        st.image(str(LOGO), width=190)
-        st.title("BD & Marketing Hub — live demo", anchor=False)
-        st.markdown(
-            "One app for a small business-development team selling quantum teaching labs to universities: leads and "
-            "contacts, follow-up cadences, every call, email, WhatsApp and meeting on one timeline, a knowledge base, "
-            "quotations, partners, events, a content calendar, news signals and a weekly leadership report.")
+        st.image(str(LOGO), width=170)
+        html_block(
+            '<div class="qa-hero"><div class="qa-hero-text"><div class="qa-hero-crumb">Live demo · portfolio project'
+            '</div><h1 class="qa-hero-title">BD &amp; Marketing Hub</h1><p class="qa-hero-sub">One app for a small '
+            'business-development team selling quantum teaching labs to universities: leads and contacts, follow-up '
+            'cadences, every call, email, WhatsApp and meeting on one timeline, a knowledge base, quotations, partners, '
+            'events, a content calendar, news signals and a weekly leadership report.</p></div></div>')
         st.caption("**Demo** is a fictional company. Every institution, person, price and number here is made up, and "
                    "the data is rebuilt every day — so click anything.")
         st.markdown("#### Explore as")

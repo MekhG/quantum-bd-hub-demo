@@ -4,36 +4,35 @@
 
 [client]
 toolbarMode = "viewer"          # hides Deploy / developer buttons
-showSidebarNavigation = false   # the sidebar menu is drawn by app/ui/layout.py instead
+showSidebarNavigation = false   # the menu runs along the top (st.navigation position="top")
 
 [server]
 maxUploadSize = 15              # MB; matches the importer's own limit
 
 [theme]
-# Headings use Fraunces, a warm old-style serif that suits the brown palette; body text and tables use IBM Plex Sans,
-# which stays easy to read at small sizes and in numbers.
-font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap, sans-serif"
+# "Studio" look: Fraunces headings (a warm old-style serif) over DM Sans, a round, friendly sans for text and tables.
+font = "'DM Sans':https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap, sans-serif"
 headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap, serif"
-codeFont = "'IBM Plex Mono':https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap, monospace"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap, monospace"
 baseFontSize = 15
 headingFontSizes = ["2.05rem", "1.45rem", "1.18rem", "1.04rem"]
 headingFontWeights = [600, 600, 500, 500]
 metricValueFontSize = "1.9rem"
-baseRadius = "0.6rem"
-buttonRadius = "0.5rem"
+baseRadius = "0.9rem"
+buttonRadius = "full"          # pill buttons
 showWidgetBorder = true
-showSidebarBorder = true
-paddingTop = "1.5rem"
+showSidebarBorder = false
+paddingTop = "1rem"
 
 [theme.light]
 primaryColor = "#7A4A26"   # saddle brown; white text on it ≈ 7.6:1
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F7F0E6"   # beige
+backgroundColor = "#F8F3EC"   # cream canvas; cards sit on it in white
+secondaryBackgroundColor = "#EFE5D7"   # beige (inputs, chips)
 textColor = "#2B1C10"   # dark enough that faded captions still pass WCAG AA (≥ 4.5:1)
 linkColor = "#7A4A26"
-borderColor = "#E6D8C4"
-dataframeBorderColor = "#EDE2D3"
-dataframeHeaderBackgroundColor = "#F7F0E6"
+borderColor = "#E3D5C1"
+dataframeBorderColor = "#EAE0D2"
+dataframeHeaderBackgroundColor = "#F3EADD"
 # Streamlit's "blue" badges and accents become the brand brown, so every brand-coloured chip follows the theme.
 blueColor = "#8B5A2B"
 blueTextColor = "#6A3F1E"

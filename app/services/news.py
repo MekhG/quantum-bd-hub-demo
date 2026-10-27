@@ -355,7 +355,7 @@ def news_topics(session: Session) -> list[str]:
 
 
 def unread_lead_news(session: Session, days: int = 14) -> int:
-    """New items that name a lead institution — the sidebar badge."""
+    """New items that name a lead institution — the attention strip under the command bar."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     # Counted in Python: 'no match' may be stored as SQL NULL or JSON null depending on the database.
     return sum(1 for ids in session.scalars(select(NewsItem.matched_org_ids).where(

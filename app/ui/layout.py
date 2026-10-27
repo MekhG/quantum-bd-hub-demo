@@ -1,4 +1,5 @@
-"""Shared look: the sidebar menu, the top bar (search, + New, alerts), page headers, empty states, stage colours.
+"""Shared look: the top menu, the command bar (search, + New, alerts, who you are), the "needs attention" strip,
+banner page headers, empty states, stage colours.
 
 Colours and fonts come from .streamlit/config.toml; the few custom pieces (chips, initials, cards) come from
 app/ui/components.py so every page looks the same.
@@ -6,7 +7,6 @@ app/ui/components.py so every page looks the same.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -34,13 +34,6 @@ _KIND_ICON = {"lead": ":material/target:", "contact": ":material/person:", "coll
 _ALERT_ICON = {"handoff": ":material/forward:", "query": ":material/schedule:", "ghost": ":material/help:"}
 
 
-@st.cache_resource
-def _logo_b64() -> str:
-    import base64
-
-    return base64.b64encode(LOGO.read_bytes()).decode()
-
-
 @st.cache_data(ttl=60, show_spinner=False)
 def load_shell_counts(user_id: int, user_name: str) -> ShellCounts:
     """Badges and alerts. Cached briefly; any save clears the cache (st.cache_data.clear) so they refresh."""
@@ -48,47 +41,65 @@ def load_shell_counts(user_id: int, user_name: str) -> ShellCounts:
         return shell_counts(session, user_id, user_name)
 
 
-def _badge_label(title: str, counts: ShellCounts) -> str:
-    # Counts ride in the label as Streamlit badges (text + colour, never colour alone).
-    if title == "Today" and counts.due_now:
-        tone = "orange" if counts.overdue else "blue"
-        return f"{title} :{tone}-badge[{counts.due_now}]"
-    if title == "Queries" and counts.late_queries:
-        return f"{title} :orange-badge[{counts.late_queries} late]"
-    if title == "News & signals" and counts.lead_news:
-        return f"{title} :blue-badge[{counts.lead_news}]"
-    if title == "Partners" and counts.registrations:
-        return f"{title} :orange-badge[{counts.registrations} to decide]"
-    if title == "Content" and counts.posts_waiting:
-        return f"{title} :orange-badge[{counts.posts_waiting} to approve]"
-    if title == "Privacy requests" and counts.privacy_open:
-        return (f"{title} :orange-badge[{counts.privacy_overdue} overdue]" if counts.privacy_overdue
-                else f"{title} :blue-badge[{counts.privacy_open}]")
-    return title
+def _attention(counts: ShellCounts) -> list[tuple[str, str, str, dict | None]]:
+    """What needs a look now, as (page, label, icon, query params). Shown as a strip of chips under the command bar,
+    so the counts are visible from every page (text, never colour alone)."""
+    items: list[tuple[str, str, str, dict | None]] = []
+    if counts.due_now:
+        late = f", {counts.overdue} overdue" if counts.overdue else ""
+        items.append(("views/today.py", f"{counts.due_now} due today{late}", ":material/today:", None))
+    if counts.late_queries:
+        items.append(("views/queries.py", f"{counts.late_queries} late {'query' if counts.late_queries == 1 else 'queries'}",
+                      ":material/forum:", None))
+    if counts.lead_news:
+        items.append(("views/news.py", f"{counts.lead_news} news about leads", ":material/newspaper:", None))
+    if counts.registrations:
+        items.append(("views/partners.py", f"{counts.registrations} deal registration to decide"
+                      if counts.registrations == 1 else f"{counts.registrations} deal registrations to decide",
+                      ":material/handshake:", None))
+    if counts.posts_waiting:
+        items.append(("views/content.py", f"{counts.posts_waiting} post{'s' if counts.posts_waiting != 1 else ''} "
+                      "to approve", ":material/campaign:", None))
+    if counts.privacy_open:
+        text = (f"{counts.privacy_overdue} privacy request{'s' if counts.privacy_overdue != 1 else ''} overdue"
+                if counts.privacy_overdue else
+                f"{counts.privacy_open} privacy request{'s' if counts.privacy_open != 1 else ''} open")
+        items.append(("views/privacy.py", text, ":material/shield_person:", None))
+    return items
 
 
-def render_sidebar(sections: Mapping[str, Sequence[st.Page]], user: CurrentUser, counts: ShellCounts) -> None:
+def _person_menu(user: CurrentUser) -> None:
+    """Who you are, top right: a pill with your initials; inside, your role and the persona switch (or sign out)."""
+    with st.popover(user.first_name or user.name, icon=":material/account_circle:", key="qa-person"):
+        html_block(f'<div class="qa-user">{avatar(user.name, 40)}<div><b>{esc(user.name)}</b>'
+                   f'{chip(_ROLE_LABEL.get(user.role, user.role.title()), "blue")}</div></div>')
+        if is_demo():
+            from app.demo.personas import switch_persona
+
+            st.caption("Try the hub as someone else — the menus and buttons change with the role.")
+            st.button("Switch persona", on_click=switch_persona, icon=":material/switch_account:", width="stretch",
+                      key="switch_persona")
+        elif auth_configured():
+            st.button("Sign out", on_click=st.logout, icon=":material/logout:", width="stretch", key="sign_out")
+
+
+def render_shell(user: CurrentUser, counts: ShellCounts) -> None:
+    """Everything above the page: the logo in the top menu, the command bar and the attention strip."""
     inject_css()
-    with st.sidebar:
-        st.markdown(f'<img src="data:image/png;base64,{_logo_b64()}" alt="Demo" width="150" '
-                    'style="margin-bottom:0.15rem">', unsafe_allow_html=True)
-        st.caption("**BD & Marketing Hub**")
-        for section, pages in sections.items():
-            html_block(f'<div class="qa-eyebrow" style="margin:0.6rem 0 -0.35rem 0.55rem">{esc(section)}</div>')
-            for page in pages:
-                st.page_link(page, label=_badge_label(page.title, counts), icon=page.icon, width="stretch")
-        st.space("medium")
-        with st.container(border=True):
-            html_block(f'<div class="qa-user">{avatar(user.name, 36, colour="#7A4A26")}<div><b>{esc(user.name)}</b>'
-                       f'{chip(_ROLE_LABEL.get(user.role, user.role.title()), "blue")}</div></div>')
-            if is_demo():
-                from app.demo.personas import switch_persona
-
-                st.button("Switch persona", on_click=switch_persona, icon=":material/switch_account:",
-                          type="tertiary", key="switch_persona")
-            elif auth_configured():
-                st.button("Sign out", on_click=st.logout, icon=":material/logout:", type="tertiary",
-                          key="sign_out")
+    st.logo(str(LOGO), size="large", icon_image=str(MARK))
+    with st.container(key="qa-topbar"):
+        left, right = st.columns([3.0, 2.0], vertical_alignment="center")
+        with left:
+            _search_box()
+        with right, st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+            _alerts(counts)
+            _new_menu(user)
+            _person_menu(user)
+    items = _attention(counts)
+    if items:
+        with st.container(horizontal=True, gap="small", key="qa-attention"):
+            for page, label, icon_name, params in items:
+                st.page_link(page, label=label, icon=icon_name, query_params=params)
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -175,22 +186,17 @@ def _alerts(counts: ShellCounts) -> None:
                 st.caption(alert.detail)
 
 
-def top_bar(user: CurrentUser, counts: ShellCounts) -> None:
-    with st.container(key="qa-topbar"):
-        left, right = st.columns([3.2, 1.6], vertical_alignment="top")
-        with left:
-            _search_box()
-        with right, st.container(horizontal=True, horizontal_alignment="right", gap="small"):
-            _alerts(counts)
-            _new_menu(user)
-
-
 def page_header(title: str, subtitle: str | None = None, eyebrow: str | None = None) -> None:
-    if eyebrow:
-        html_block(f'<div class="qa-eyebrow">{esc(eyebrow)}</div>')
-    st.title(title, anchor=False)
-    if subtitle:
-        st.caption(subtitle)
+    """A banner at the top of each page: the page's icon in a round badge, where you are, the title and one line on
+    what the page is for."""
+    symbol = st.session_state.get("_qa_page_icon") or ""
+    symbol = symbol.removeprefix(":material/").removesuffix(":")
+    badge = (f'<div class="qa-hero-badge" aria-hidden="true"><span class="qa-ms">{esc(symbol)}</span></div>'
+             if symbol else "")
+    crumb = f'<div class="qa-hero-crumb">{esc(eyebrow)}</div>' if eyebrow else ""
+    sub = f'<p class="qa-hero-sub">{esc(subtitle)}</p>' if subtitle else ""
+    html_block(f'<div class="qa-hero">{badge}<div class="qa-hero-text">{crumb}<h1 class="qa-hero-title">'
+               f'{esc(title)}</h1>{sub}</div></div>')
 
 
 def section_header(title: str, caption: str | None = None) -> None:

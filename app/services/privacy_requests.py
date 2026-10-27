@@ -282,7 +282,7 @@ def requests_frame(session: Session, today: date | None = None) -> pd.DataFrame:
 
 
 def open_counts(session: Session, today: date | None = None) -> tuple[int, int]:
-    """(open, overdue) — for the Dashboard and the sidebar."""
+    """(open, overdue) — for the Dashboard and the attention strip."""
     today = today or today_ist()
     open_filter = DataRequest.status.in_(("open", "in_progress"))
     total = session.scalar(select(func.count(DataRequest.id)).where(open_filter)) or 0

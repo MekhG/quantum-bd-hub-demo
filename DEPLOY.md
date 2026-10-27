@@ -33,7 +33,7 @@ git push -u origin main
 ## 3. Check it
 - Open the link in a private window → the welcome page → **Explore as Riya**.
 - Today shows overdue and due tasks; Dashboard, Weekly report, Quotes and GTM charts have data.
-- **Switch persona** (sidebar card) → Leadership: editing buttons are gone (view only).
+- Your name (top right) → **Switch persona** → Leadership: editing buttons are gone (view only).
 
 ## Putting it on your portfolio site
 - **Link** to the app with a short line: *Live demo — pick a persona and click anything; all data is fictional.*

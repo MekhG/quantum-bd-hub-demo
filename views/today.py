@@ -1,5 +1,5 @@
-"""Today: who to contact today — overdue and due tasks as cards, plus a side panel with the week's progress,
-hand-offs, the email batch and Ghosted decisions."""
+"""Today: who to contact today — the week's figures across the top, overdue and due tasks as cards (actions on the
+right), and a side column with hand-offs, the email batch and Ghosted decisions."""
 
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ from app.services.tasks import (
     week_summary,
 )
 from app.ui.common import require_user
-from app.ui.components import avatar, card, channel_tile, chip, chips, day, esc, html_block, progress
-from app.ui.layout import load_shell_counts
+from app.ui.components import avatar, card, chip, chips, day, esc, html_block, progress
+from app.ui.layout import load_shell_counts, page_header
 from app.ui.task_dialog import hand_off_dialog
 
 user = require_user()
@@ -183,12 +183,16 @@ def _handed_from(task: dict) -> str:
     return ""
 
 
+_CHANNEL_WORD = {"email": "Email", "phone": "Call", "whatsapp": "WhatsApp", "meeting": "Meeting", "demo": "Demo",
+                 "linkedin": "LinkedIn", "web": "Enquiry", "other": "Enquiry", "task": "Task", "internal": "Internal"}
+
+
 def task_card(task: dict, show_owner: bool) -> None:
     can = user.can("member")
     late = task["Bucket"] == "Overdue"
     key = task["activity_id"]
-    with card(str(key), "late" if late else "plain"):
-        # Content first, actions underneath: shorter cards, and the same layout on a phone.
+    with card(f"ch{task['channel']}-{key}", "late" if late else "plain"):
+        body, actions = st.columns([5, 1.3], vertical_alignment="center", gap="medium")
         title = esc(task["Task"])
         if task["Institution"]:
             title += f'<span class="qa-sep">·</span><span style="font-weight:500">{esc(task["Institution"])}</span>'
@@ -201,7 +205,7 @@ def task_card(task: dict, show_owner: bool) -> None:
                          f'{esc(task["Phone"])}</a>')
         due_text, due_tone = _due_chip(task)
         handed = _handed_from(task)
-        tags = [task["Track"], task["Step"] or (task["Stage"] if task["Track"] else ""), (due_text, due_tone)]
+        tags = [(due_text, due_tone), task["Track"], task["Step"] or (task["Stage"] if task["Track"] else "")]
         if task["lead_id"] and task["Score"] >= HOT:
             tags.insert(0, (f"Hot · score {task['Score']}", "yellow"))
         if show_owner:
@@ -209,21 +213,24 @@ def task_card(task: dict, show_owner: bool) -> None:
         if handed:
             tags.append((f"From {handed}", "purple"))
         note = task["Note"] if task["Note"] and not task["Cadence"] else ""
-        html_block(
-            f'<div class="qa-row">{channel_tile(task["channel"])}<div class="qa-row-main">'
-            f'<div class="qa-row-title">{title}</div>'
-            + (f'<div class="qa-muted">{esc(person)}</div>' if person else "")
-            + (f'<div class="qa-small qa-muted">{" · ".join(reach)}</div>' if reach else "")
-            + f'<div style="margin-top:4px">{chips(tags)}</div>'
-            + (f'<div class="qa-small qa-muted" style="margin-top:4px">Note: {esc(note)}</div>' if note else "")
-            + "</div></div>")
-        with st.container(horizontal=True, gap="small", key=f"qa-actions-{key}"):
-            if st.button("Done", icon=":material/check:", type="primary" if late else "secondary", key=f"done_{key}",
-                         disabled=not can):
+        with body:
+            html_block(
+                f'<div class="qa-row-main">'
+                f'<div class="qa-eyebrow-ch">{esc(_CHANNEL_WORD.get(task["channel"], "Task"))}</div>'
+                f'<div class="qa-row-title">{title}</div>'
+                + (f'<div class="qa-muted">{esc(person)}</div>' if person else "")
+                + (f'<div class="qa-small qa-muted">{" · ".join(reach)}</div>' if reach else "")
+                + f'<div style="margin-top:6px">{chips(tags)}</div>'
+                + (f'<div class="qa-small qa-muted" style="margin-top:4px">Note: {esc(note)}</div>' if note else "")
+                + "</div>")
+        with actions, st.container(gap="small", key=f"qa-actions-{key}"):
+            if st.button("Done", icon=":material/check:", type="primary", key=f"done_{key}", disabled=not can,
+                         width="stretch"):
                 done_dialog(task)
-            if st.button("Reschedule", key=f"move_{key}", disabled=not can):
+            if st.button("Reschedule", icon=":material/event_repeat:", key=f"move_{key}", disabled=not can,
+                         width="stretch"):
                 reschedule_dialog(task)
-            with st.popover("More", icon=":material/more_horiz:", disabled=not can):
+            with st.popover("More", icon=":material/more_horiz:", disabled=not can, width="stretch"):
                 if st.button("Skip", icon=":material/skip_next:", key=f"skip_{key}", width="stretch"):
                     skip_dialog(task)
                 if st.button("Hand off", icon=":material/forward:", key=f"hand_{key}", width="stretch"):
@@ -232,7 +239,7 @@ def task_card(task: dict, show_owner: bool) -> None:
                     st.page_link("views/leads.py", label="Open lead", icon=":material/open_in_new:",
                                  query_params={"lead": int(task["lead_id"])}, width="stretch")
             if str(task["Task"]).startswith("Prepare last week's report"):
-                st.page_link("views/report.py", label="Open weekly report", icon=":material/summarize:")
+                st.page_link("views/report.py", label="Open report", icon=":material/summarize:")
 
 
 def task_section(title: str, frame: pd.DataFrame, key: str, show_owner: bool, tone: str) -> None:
@@ -275,30 +282,37 @@ def list_view(frame: pd.DataFrame) -> None:
         st.caption("Tick tasks at the left edge to act on several at once.")
 
 
-def week_panel(week: dict[str, int], whose: str) -> None:
-    with card("week"):
-        st.markdown("**Your week**" if whose == "Mine" else f"**{whose} — this week**")
-        done, planned = week["done"], max(week["planned"], 1)
-        html_block(f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">'
-                   f'<span class="qa-muted">Tasks done</span><span><b style="font-size:1.25rem">{done}</b>'
-                   f'<span class="qa-muted"> of {week["planned"]}</span></span></div>'
+def week_strip(week: dict[str, int], whose: str) -> None:
+    """The week at a glance, as a row of figures across the top of the page."""
+    done, planned = week["done"], max(week["planned"], 1)
+    targets = _my_targets(user.id) if whose == "Mine" else pd.DataFrame()
+    first, second, third, fourth = st.columns([1.2, 0.8, 0.8, 1.6])
+    with first, card("wk-done"):
+        html_block(f'<div class="qa-eyebrow-ch">{"Your week" if whose == "Mine" else esc(whose) + " · this week"}</div>'
+                   f'<div style="display:flex;align-items:baseline;gap:6px;margin:2px 0 8px">'
+                   f'<span class="qa-display" style="font-size:2rem">{done}</span>'
+                   f'<span class="qa-muted">of {week["planned"]} tasks done</span></div>'
                    + progress(done / planned, f"{done} of {week['planned']} tasks done this week"))
-        c1, c2 = st.columns(2)
-        c1.metric("Replies", week["replies"], border=True)
-        c2.metric("Demos", week["demos"], border=True, help="Demos booked this week")
-        if whose == "Mine":
-            targets = _my_targets(user.id)
-            if not targets.empty:
-                st.markdown("**Targets this week**")
-                bars = []
-                for row in targets.to_dict("records"):
-                    done_n, target = int(row["Actual"]), int(row["Target"])
-                    bars.append(f'<div style="display:flex;justify-content:space-between;margin-top:6px">'
-                                f'<span class="qa-small">{esc(row["Metric"])}</span><span class="qa-small">'
-                                f'<b>{done_n}</b><span class="qa-muted"> of {target}</span></span></div>'
-                                + progress(min(done_n / target, 1.0) if target else 1.0,
-                                           f"{row['Metric']}: {done_n} of {target}"))
-                html_block("".join(bars))
+    with second, card("wk-replies"):
+        html_block(f'<div class="qa-eyebrow-ch">Replies</div><div class="qa-display" style="font-size:2rem">'
+                   f'{week["replies"]}</div>')
+    with third, card("wk-demos"):
+        html_block(f'<div class="qa-eyebrow-ch">Demos booked</div><div class="qa-display" style="font-size:2rem">'
+                   f'{week["demos"]}</div>')
+    with fourth, card("wk-targets"):
+        html_block('<div class="qa-eyebrow-ch">Targets this week</div>')
+        if targets.empty:
+            st.caption("No targets set for this week." if whose == "Mine" else "Targets show on each person's own Today.")
+        else:
+            bars = []
+            for row in targets.head(3).to_dict("records"):
+                done_n, target = int(row["Actual"]), int(row["Target"])
+                bars.append(f'<div style="display:flex;justify-content:space-between;margin-top:4px">'
+                            f'<span class="qa-small">{esc(row["Metric"])}</span><span class="qa-small">'
+                            f'<b>{done_n}</b><span class="qa-muted"> of {target}</span></span></div>'
+                            + progress(min(done_n / target, 1.0) if target else 1.0,
+                                       f"{row['Metric']}: {done_n} of {target}"))
+            html_block("".join(bars))
 
 
 def notes_panel() -> None:
@@ -422,8 +436,6 @@ due = tasks[tasks["Bucket"] == "Due"].sort_values(["Score", "Due"], ascending=[F
 upcoming = tasks[tasks["Bucket"] == "Coming up"]
 
 with head:
-    st.caption(now.strftime("%A, %d %B %Y"))
-    st.title(f"{greeting}, {user.first_name}" if whose == "Mine" else f"Tasks — {whose}", anchor=False)
     total = len(overdue) + len(due)
     summary = f"{total} task{'s' if total != 1 else ''} today" if total else "Nothing due today"
     if len(overdue):
@@ -432,7 +444,10 @@ with head:
     if late_queries and whose == "Mine":
         summary += f". {len(late_queries)} quer{'y has' if len(late_queries) == 1 else 'ies have'} passed the " \
                    "1-day reply target"
-    st.markdown(summary + ".")
+    page_header(f"{greeting}, {user.first_name}" if whose == "Mine" else f"Tasks — {whose}", summary + ".",
+                eyebrow=now.strftime("%A, %d %B %Y"))
+
+week_strip(week, whose)
 
 main, side = st.columns([2.25, 1], gap="large")
 with main:
@@ -462,7 +477,6 @@ with main:
                          column_config={"Due": st.column_config.DateColumn(format="ddd DD MMM")})
 
 with side:
-    week_panel(week, whose)
     handoff_panel(tasks)
     if not batch.empty:
         email_batch_panel(batch)
