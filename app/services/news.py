@@ -1,5 +1,5 @@
 """News: fetch the free feeds (Google News searches, RSS such as PIB), tag each item with its topic and a suggested
-signal type, spot lead institutions named in it, and act on items (save as a signal, save to the Library,
+signal type, spot lead organisations named in it, and act on items (save as a signal, save to the Library,
 bookmark, dismiss).
 
 Everything here is rule-based and free: keyword matching against the headline and summary, no paid API, no AI.
@@ -43,6 +43,7 @@ _ROLE_RANK = {"viewer": 0, "member": 1, "admin": 2}
 # Words that, on their own, describe many institutions — names made only of these are never matched in news.
 GENERIC_WORDS = frozenset("""
 government govt college colleges degree science sciences arts commerce engineering institute institution technology
+organisation company companies limited ltd pvt private technologies systems solutions services labs india group
 technological of and the for in at university universities polytechnic women womens woman girls boys mahavidyalaya
 vidyalaya school model autonomous national state central junior senior first grade pg post graduate centre center
 research studies management education educational department dept city district rural urban new public private
@@ -77,9 +78,9 @@ def _utc(value: datetime | None) -> datetime | None:
 
 
 class OrgMatcher:
-    """Finds lead institutions named in a piece of text by looking up every run of up to 12 words in a table of
+    """Finds lead organisations named in a piece of text by looking up every run of up to 12 words in a table of
     normalised names, short forms and aliases. A name is skipped when it is made only of generic words
-    ('Government Degree College') or when it belongs to more than one institution — a wrong match is worse than
+    ('Government Degree College') or when it belongs to more than one organisation — a wrong match is worse than
     a missed one."""
 
     def __init__(self, orgs: Iterable[tuple[int, str, list[str]]]) -> None:
@@ -298,7 +299,7 @@ def fetch_news(session: Session, *, force: bool = False, fetch: Callable[[str], 
 
 
 def rematch(session: Session, days: int = 60) -> int:
-    """Re-runs institution matching and type suggestions on recent items (after aliases or headline words change)."""
+    """Re-runs organisation matching and type suggestions on recent items (after aliases or headline words change)."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     matcher = OrgMatcher(lead_orgs(session))
     suggester = TypeSuggester(session.scalars(select(SignalType)))
@@ -355,7 +356,7 @@ def news_topics(session: Session) -> list[str]:
 
 
 def unread_lead_news(session: Session, days: int = 14) -> int:
-    """New items that name a lead institution — the attention strip under the command bar."""
+    """New items that name a lead organisation — the attention strip under the command bar."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     # Counted in Python: 'no match' may be stored as SQL NULL or JSON null depending on the database.
     return sum(1 for ids in session.scalars(select(NewsItem.matched_org_ids).where(
@@ -377,13 +378,13 @@ def set_status(session: Session, item_id: int, status: str, user: User) -> None:
 
 def save_as_signal(session: Session, item_id: int, *, org_ids: list[int], type_id: int, observed_on: date,
                    user: User, note: str | None = None) -> int:
-    """Saves the item as a signal for each chosen institution. Returns how many signals were added."""
+    """Saves the item as a signal for each chosen organisation. Returns how many signals were added."""
     _require(user)
     item = session.get(NewsItem, item_id)
     if item is None:
         raise NewsError("That news item is gone — refresh the page.")
     if not org_ids:
-        raise NewsError("Pick at least one institution.")
+        raise NewsError("Pick at least one organisation.")
     added = 0
     for org_id in dict.fromkeys(org_ids):
         _, created = add_signal(session, org_id=org_id, type_id=type_id, observed_on=observed_on, user=user,
@@ -485,11 +486,11 @@ def save_sources(session: Session, frame: pd.DataFrame, user: User) -> int:
 
 
 def save_org_aliases(session: Session, org_id: int, text: str, user: User) -> list[str]:
-    """Other names for an institution, comma-separated (e.g. 'IIT Bombay, IITB')."""
+    """Other names for an organisation, comma-separated (e.g. 'IIT Bombay, IITB')."""
     _require(user)
     org = session.get(Organisation, org_id)
     if org is None:
-        raise SignalError("That institution no longer exists.")
+        raise SignalError("That organisation no longer exists.")
     aliases = list(dict.fromkeys(a.strip() for a in text.split(",") if a.strip()))[:20]
     before = org.aliases or []
     org.aliases = aliases or None

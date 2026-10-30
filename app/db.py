@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
@@ -41,6 +42,40 @@ def make_engine(url: str) -> Engine:
     )
 
 
+# ---------------------------------------------------------------- data generation
+# A number that goes up whenever anything is saved (a commit that wrote rows) or the demo data is swapped. The app
+# compares it on every run and clears its caches when it moved, so pages can cache their tables for an hour and
+# still never show something older than the last save — whoever made it, on whichever page.
+_generation = 0
+_generation_lock = threading.Lock()
+
+
+def data_generation() -> int:
+    return _generation
+
+
+def bump_generation() -> None:
+    global _generation
+    with _generation_lock:
+        _generation += 1
+
+
+@event.listens_for(Session, "after_flush")
+def _note_write(session: Session, _context) -> None:
+    session.info["wrote"] = True  # a flush only fires when rows were actually inserted, changed or deleted
+
+
+@event.listens_for(Session, "after_commit")
+def _after_commit(session: Session) -> None:
+    if session.info.pop("wrote", False):
+        bump_generation()
+
+
+@event.listens_for(Session, "after_rollback")
+def _after_rollback(session: Session) -> None:
+    session.info.pop("wrote", None)
+
+
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     return make_engine(get_database_url())
@@ -57,6 +92,7 @@ def reset_engine() -> None:
         get_engine().dispose()
     get_engine.cache_clear()
     _session_factory.cache_clear()
+    bump_generation()
 
 
 @contextmanager

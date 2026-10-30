@@ -47,7 +47,8 @@ def shell_counts(session: Session, user_id: int, user_name: str) -> ShellCounts:
     passed = tasks[(tasks["From"] != "") | tasks["Note"].str.contains(HANDOFF_MARK, regex=False)]
     for row in passed.head(8).to_dict("records"):
         who = row["From"] or row["Note"].split(HANDOFF_MARK, 1)[-1].split(" to ", 1)[0].strip()
-        counts.alerts.append(Alert("handoff", f"{row['Task']}" + (f" · {row['Institution']}" if row["Institution"] else ""),
+        where = f" · {row['Organisation']}" if row["Organisation"] else ""
+        counts.alerts.append(Alert("handoff", f"{row['Task']}{where}",
                                    f"From {who} · due {row['Due'].strftime('%d %b')}", _lead(row["lead_id"])))
 
     queries = queries_frame(session, days=30)
@@ -55,7 +56,7 @@ def shell_counts(session: Session, user_id: int, user_name: str) -> ShellCounts:
         late = queries[queries["Status"] == "Reply overdue"]
         counts.late_queries = len(late)
         for row in late[late["Owner"] == user_name].head(5).to_dict("records"):
-            counts.alerts.append(Alert("query", f"Reply overdue · {row['From'] or row['Institution']}",
+            counts.alerts.append(Alert("query", f"Reply overdue · {row['From'] or row['Organisation']}",
                                        f"{row['Channel']} · received {row['Received'].strftime('%d %b, %H:%M')}",
                                        _lead(row["lead_id"])))
 

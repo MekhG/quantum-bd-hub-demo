@@ -17,8 +17,9 @@ repo_url = get_setting("DEMO_REPO_URL")
 
 st.markdown(
     f"This is a working copy of an internal business-development hub built by **{author}** for a deep-tech company "
-    "that sells quantum teaching labs (simulators and benchtop experimentation kits) to universities in India. "
-    "The code and every feature are the real thing; the company **Demo**, its team, institutions, contacts and prices "
+    "that sells quantum teaching labs (simulators and benchtop experimentation kits) to universities in India — "
+    "and quantum upskilling to companies and public bodies. "
+    "The code and every feature are the real thing; the company **Demo**, its team, organisations, contacts and prices "
     "are fictional." + (f" More projects: [portfolio]({author_url})." if author_url else ""))
 
 left, right = st.columns(2)
@@ -32,7 +33,8 @@ with left, st.container(border=True):
 with right, st.container(border=True):
     st.markdown("**What the hub does**")
     st.markdown(
-        "- One CRM of institutions, contacts and leads across seven lead tracks, with safe spreadsheet imports.\n"
+        "- One CRM for any organisation — universities, companies, schools, labs, public bodies — filtered by "
+        "industry, with contacts and leads across eight lead tracks and safe spreadsheet imports.\n"
         "- **Cadences** plan every follow-up; a reply stops them; Today shows each person's work.\n"
         "- Quotes as Word files, partner deal registration, post-sale warranty/AMC, events and community, a "
         "LinkedIn content calendar, news signals with lead scoring, and DPDP privacy requests.\n"

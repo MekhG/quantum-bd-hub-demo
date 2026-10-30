@@ -62,7 +62,7 @@ def _flash(message: str, kind: str = "success", details: list[str] | None = None
     st.rerun()
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _docx(quote_id: int, stamp: str) -> tuple[bytes, str]:
     # stamp = the quote's updated_at, so an edited quote gets a fresh file.
     with session_scope() as session:
@@ -93,8 +93,8 @@ def deal_dialog(lead_id: int, user: CurrentUser, deal_id: int | None = None) -> 
     default_route = (current["route"] if current else suggested) or ""
     route = a.selectbox("Buying route", route_opts, index=route_opts.index(default_route) if default_route
                         in route_opts else 0, format_func=lambda r: r or "Not known yet", key=f"dl_route_{deal_id}",
-                        help="Sets the document checklist. Suggested from the institution's management type "
-                             "(Demo is not on GeM, so government institutions use the PAC route).")
+                        help="Sets the document checklist. Suggested from the organisation's management type "
+                             "(Demo is not on GeM, so government organisations use the PAC route).")
     fund_opts = ["", *funding]
     fund = b.selectbox("Funding source", fund_opts, index=fund_opts.index(current["funding"])
                        if current and current["funding"] in fund_opts else 0,
@@ -226,7 +226,7 @@ def quote_dialog(deal_id: int, user: CurrentUser, quote_id: int | None = None, m
                                 value=int(draft.valid_days) if draft and draft.valid_days else
                                 int(settings.get("quote_validity_days") or 30), key=f"{key}_days")
     ref_code = d.text_input("Reference code", value=institution_code(org_name), key=f"{key}_code",
-                            disabled=mode != "new", help="The institution part of the reference, e.g. ALU in "
+                            disabled=mode != "new", help="The organisation part of the reference, e.g. ALU in "
                                                          "DEMO/SVU/2026-27/001.")
 
     with st.container(border=True):

@@ -169,9 +169,9 @@ def upcoming_demos(session: Session, days: int = 14, today: date | None = None) 
         .order_by(Activity.scheduled_at)
     ).all()
     return pd.DataFrame([{"When": pd.Timestamp(when).tz_convert(IST).tz_localize(None), "What": kind,
-                          "Institution": org or "", "Who": who or "", "lead_id": lead_id}
+                          "Organisation": org or "", "Who": who or "", "lead_id": lead_id}
                          for when, kind, org, who, lead_id in rows],
-                        columns=["When", "What", "Institution", "Who", "lead_id"])
+                        columns=["When", "What", "Organisation", "Who", "lead_id"])
 
 
 # ---------------------------------------------------------------- Week 8: pipeline, expiring quotes, won and lost
@@ -189,9 +189,9 @@ def expiring_quotes(session: Session, days: int = 7, today: date | None = None) 
         .join(Organisation, Organisation.id == Lead.org_id)
         .where(Quote.status == "sent", Quote.valid_until >= today, Quote.valid_until <= today + timedelta(days=days))
         .order_by(Quote.valid_until)).all()
-    return pd.DataFrame([{"Quote": f"{n} v{v}", "Institution": org, "lead_id": lid, "Valid until": until,
+    return pd.DataFrame([{"Quote": f"{n} v{v}", "Organisation": org, "lead_id": lid, "Valid until": until,
                           "Value": float((sub or 0) - (disc or 0))} for n, v, org, lid, until, sub, disc in rows],
-                        columns=["Quote", "Institution", "lead_id", "Valid until", "Value"])
+                        columns=["Quote", "Organisation", "lead_id", "Valid until", "Value"])
 
 
 def won_lost_by_month(session: Session, months: int = 6, today: date | None = None) -> pd.DataFrame:

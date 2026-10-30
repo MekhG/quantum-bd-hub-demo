@@ -1,6 +1,6 @@
 """Signals and the lead score.
 
-A lead's score = the points of its institution's active signals (each signal type counted once — the most recent —
+A lead's score = the points of its organisation's active signals (each signal type counted once — the most recent —
 so five news items about the same grant don't stack) + automatic points the hub works out from its own data:
 
 - Open quotation: a quote on one of the lead's deals is sent and still valid.
@@ -148,12 +148,12 @@ def save_types(session: Session, frame: pd.DataFrame, user: User) -> int:
 def add_signal(session: Session, *, org_id: int, type_id: int, observed_on: date, user: User,
                source_url: str | None = None, note: str | None = None,
                news_item_id: int | None = None) -> tuple[OrgSignal, bool]:
-    """Saves a signal against an institution. Returns (signal, created) — the same signal twice is not duplicated."""
+    """Saves a signal against an organisation. Returns (signal, created) — the same signal twice is not duplicated."""
     _require(user)
     org = session.get(Organisation, org_id)
     kind = session.get(SignalType, type_id)
     if org is None:
-        raise SignalError("Pick an institution.")
+        raise SignalError("Pick an organisation.")
     if kind is None or not kind.is_active:
         raise SignalError("Pick a signal type.")
     if kind.code is not None:
@@ -328,12 +328,12 @@ def signals_frame(session: Session, today: date | None = None, *, include_faded:
         points = points_now(kind.weight, kind.decay_months, signal.observed_on, today) if kind.is_active else 0
         if not include_faded and points == 0:
             continue
-        records.append({"id": signal.id, "org_id": signal.org_id, "Institution": org_name, "Signal": kind.name,
+        records.append({"id": signal.id, "org_id": signal.org_id, "Organisation": org_name, "Signal": kind.name,
                         "Points now": points, "Seen on": signal.observed_on,
                         "Counts until": expires_on(kind.decay_months, signal.observed_on),
                         "Source": signal.source_url or "", "Note": signal.note or "", "Added by": who or "",
                         "created_by": signal.created_by_user_id})
-    return pd.DataFrame(records, columns=["id", "org_id", "Institution", "Signal", "Points now", "Seen on",
+    return pd.DataFrame(records, columns=["id", "org_id", "Organisation", "Signal", "Points now", "Seen on",
                                           "Counts until", "Source", "Note", "Added by", "created_by"])
 
 
@@ -346,11 +346,11 @@ def hot_leads(session: Session, *, threshold: int | None = None, limit: int = 10
         .join(Stage, Stage.id == Lead.stage_id).outerjoin(User, User.id == Lead.owner_user_id)
         .where(Lead.score >= threshold, Stage.outcome.in_(("open", "nurture")))
         .order_by(Lead.score.desc(), Organisation.name).limit(limit)).all()
-    return pd.DataFrame(rows, columns=["lead_id", "Institution", "Track", "Stage", "Score", "Owner"])
+    return pd.DataFrame(rows, columns=["lead_id", "Organisation", "Track", "Stage", "Score", "Owner"])
 
 
 def lead_orgs(session: Session) -> list[tuple[int, str, list[str]]]:
-    """Institutions that have at least one lead: (id, name, aliases). The pool news is matched against."""
+    """Organisations that have at least one lead: (id, name, aliases). The pool news is matched against."""
     rows = session.execute(select(Organisation.id, Organisation.name, Organisation.aliases)
                            .where(select(Lead.id).where(Lead.org_id == Organisation.id).exists())
                            .order_by(Organisation.name)).all()
@@ -377,7 +377,7 @@ _SHORT_FORMS = (
 
 
 def name_variants(name: str, aliases: list[str] | None = None) -> set[str]:
-    """Normalised ways an institution is written: its name without the city after a comma or text in brackets,
+    """Normalised ways an organisation is written: its name without the city after a comma or text in brackets,
     the bracketed short form ('IISc'), common short forms ('IIT Bombay') and its aliases."""
     variants: set[str] = set()
     base = name or ""
@@ -405,7 +405,7 @@ class PasteMatch:
 
 
 def match_names(session: Session, names: list[str]) -> list[PasteMatch]:
-    """Each name → the lead institution it most likely is: exact (name, short form or alias) or close spelling."""
+    """Each name → the lead organisation it most likely is: exact (name, short form or alias) or close spelling."""
     orgs = lead_orgs(session)
     exact: dict[str, tuple[int, str]] = {}
     for oid, name, aliases in orgs:
@@ -432,18 +432,18 @@ def match_names(session: Session, names: list[str]) -> list[PasteMatch]:
 
 
 def match_pasted_names(session: Session, text: str) -> list[PasteMatch]:
-    """One institution per line (e.g. the list in a PIB release)."""
+    """One organisation per line (e.g. the list in a PIB release)."""
     return match_names(session, text.splitlines())
 
 
-SHEET_COLUMNS = ["Institution", "Signal", "Seen on", "Source link", "Note"]
+SHEET_COLUMNS = ["Organisation", "Signal", "Seen on", "Source link", "Note"]
 MAX_SHEET_BYTES = 2_000_000
 
 
 def signal_sheet_template() -> bytes:
     import io
 
-    frame = pd.DataFrame([{"Institution": "Example University", "Signal": "NQM lab approved",
+    frame = pd.DataFrame([{"Organisation": "Example University", "Signal": "NQM lab approved",
                            "Seen on": date.today(), "Source link": "https://pib.gov.in/…", "Note": "Second NQM call"}],
                          columns=SHEET_COLUMNS)
     buffer = io.BytesIO()
@@ -452,7 +452,7 @@ def signal_sheet_template() -> bytes:
 
 
 def read_signal_sheet(data: bytes, filename: str) -> pd.DataFrame:
-    """Reads an uploaded .xlsx/.csv of signals. Only Institution is required; the other columns may be blank."""
+    """Reads an uploaded .xlsx/.csv of signals. Only Organisation is required; the other columns may be blank."""
     import io
 
     if len(data) > MAX_SHEET_BYTES:
@@ -471,10 +471,13 @@ def read_signal_sheet(data: bytes, filename: str) -> pd.DataFrame:
         raise SignalError(f"Couldn't read that file ({type(error).__name__}).") from error
     frame.columns = [str(c).strip() for c in frame.columns]
     lower = {c.lower(): c for c in frame.columns}
-    if "institution" not in lower:
-        raise SignalError("The sheet needs an 'Institution' column (download the template to see the layout).")
+    for old in ("institution", "company", "organization"):  # older templates and other people's sheets
+        if old in lower and "organisation" not in lower:
+            lower["organisation"] = lower.pop(old)
+    if "organisation" not in lower:
+        raise SignalError("The sheet needs an 'Organisation' column (download the template to see the layout).")
     out = pd.DataFrame({col: frame[lower[col.lower()]] if col.lower() in lower else "" for col in SHEET_COLUMNS})
-    out = out[out["Institution"].astype(str).str.strip() != ""].head(500)
+    out = out[out["Organisation"].astype(str).str.strip() != ""].head(500)
     return out.reset_index(drop=True)
 
 
@@ -502,7 +505,7 @@ def save_signal_rows(session: Session, rows: list[dict], user: User) -> tuple[in
 
 def bulk_add(session: Session, org_ids: list[int], *, type_id: int, observed_on: date, user: User,
              source_url: str | None = None, note: str | None = None) -> tuple[int, int]:
-    """Adds the same signal to several institutions. Returns (added, already there)."""
+    """Adds the same signal to several organisations. Returns (added, already there)."""
     added = already = 0
     for org_id in dict.fromkeys(org_ids):
         _, created = add_signal(session, org_id=org_id, type_id=type_id, observed_on=observed_on, user=user,

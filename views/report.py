@@ -46,7 +46,7 @@ def _done(message: str, kind: str = "success") -> None:
     st.rerun()
 
 
-@st.cache_data(ttl=60, show_spinner="Working out the week's numbers…")
+@st.cache_data(ttl=600, show_spinner="Working out the week's numbers…")
 def _report(week_iso: str) -> tuple[dict, dict, str]:
     week = pd.Timestamp(week_iso).date()
     with session_scope() as session:
@@ -163,7 +163,7 @@ def tiles(report: dict) -> None:
         ("Quotations sent", inr(totals["quotes_value"], decimals=False), "value sent this week, excl. GST"),
         ("Deals won", inr(totals["won_value"], decimals=False), "purchase orders dated this week"),
         ("Reply rate", f"{rate:.0%}" if rate is not None else "—",
-         f"of {totals['reply_cohort']} institutions first contacted in the last 4 weeks" if rate is not None
+         f"of {totals['reply_cohort']} organisations first contacted in the last 4 weeks" if rate is not None
          else "no first contacts in the last 4 weeks"),
     ]
     with st.container(border=True, key="qa-card-plain-report-facts"):
@@ -198,12 +198,12 @@ def render_report(report: dict, comments: dict, status: str) -> None:
             st.dataframe(pd.DataFrame(report["lost"]), hide_index=True, width="stretch")
         if report["hot"]:
             st.markdown("**Hot leads**")
-            st.dataframe(pd.DataFrame(report["hot"])[["Institution", "Stage", "Score"]], hide_index=True,
+            st.dataframe(pd.DataFrame(report["hot"])[["Organisation", "Stage", "Score"]], hide_index=True,
                          width="stretch",
                          column_config={"Score": st.column_config.NumberColumn(format="%d", width="small")})
     with card("rep-team"):
         st.markdown("**Team**")
-        st.caption("Outreach = institutions contacted for the first time. Replies are credited to the lead's owner.")
+        st.caption("Outreach = organisations contacted for the first time. Replies are credited to the lead's owner.")
         if report["people"]:
             st.dataframe(pd.DataFrame(report["people"]), hide_index=True, width="stretch")
         if report["targets"]:
@@ -216,7 +216,7 @@ def render_report(report: dict, comments: dict, status: str) -> None:
     if report["segments"]:
         with card("rep-segments"):
             st.markdown("**Public and private, urban and rural**")
-            st.caption("Public/private from the institution's management; urban/rural from its area. Quotes and "
+            st.caption("Public/private from the organisation's management; urban/rural from its area. Quotes and "
                        "wins are this financial year so far.")
             segment_chart(report["segments"])
             st.dataframe(_money_text(pd.DataFrame(report["segments"]), ["Won value (FY, ₹)", "Pipeline now (₹)"]),
@@ -238,7 +238,7 @@ def community_box(report: dict) -> None:
             st.dataframe(pd.DataFrame(data["events"]), hide_index=True, width="stretch")
         if data["top_institutions"]:
             st.caption("Most participants this week: " + ", ".join(
-                f"{r['Institution']} ({r['Participants']})" for r in data["top_institutions"]))
+                f"{r['Organisation']} ({r['Participants']})" for r in data["top_institutions"]))
 
 
 def content_box(report: dict) -> None:

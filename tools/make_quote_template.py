@@ -176,7 +176,7 @@ def build() -> None:
     heading(doc, "2. What is included")
     simple_table(doc, [
         ["Included", "What it covers"],
-        ["Installation", "Set-up on site (kits) or on the institution's server (simulators), with acceptance testing."],
+        ["Installation", "Set-up on site (kits) or on the client's server (simulators), with acceptance testing."],
         ["Product training", "Hands-on sessions for the faculty who will run the laboratory."],
         ["Laboratory manuals", "Step-by-step experiment guides for students and instructors."],
         ["Remote support", "Help desk for the warranty period."],
@@ -199,7 +199,7 @@ def build() -> None:
                  "Delivery periods run from receipt of the purchase order and the advance payment: about three weeks for "
                  "simulators and about ten weeks for experimentation kits.",
                  "GST is charged as applicable at the time of invoice.",
-                 "Specifications may be adapted to the institution's needs, subject to technical feasibility."):
+                 "Specifications may be adapted to the client's needs, subject to technical feasibility."):
         p = doc.add_paragraph(style="List Bullet")
         p.paragraph_format.space_after = Pt(2)
         run(p, line, size=10)

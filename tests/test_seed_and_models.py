@@ -53,7 +53,7 @@ def test_seed_fills_configuration(session: Session) -> None:
     summary = seed_all(session)
     session.commit()
 
-    assert summary["tracks"] == len(TRACKS) == 7  # incl. Inbound queries
+    assert summary["tracks"] == len(TRACKS) == 8  # incl. Inbound queries and Enterprise
     assert count(session, Stage) == len(STAGES)
     assert count(session, ActivityType) == len(ACTIVITY_TYPES)
     assert count(session, User) == 5  # Riya, Kabir, Neha, Arjun + a view-only leadership login
@@ -198,4 +198,4 @@ def test_config_export_has_one_sheet_per_table(session: Session) -> None:
     frames = all_config_frames(session)
     data = frames_to_xlsx(frames)
     assert data[:2] == b"PK"  # xlsx files are zip archives
-    assert len(frames["Cadences"]) == 4 + 4 + 3 + 3 + 3 + 4 + 3  # one row per cadence step, track by track
+    assert len(frames["Cadences"]) == 4 + 4 + 3 + 3 + 3 + 4 + 4 + 3  # one row per cadence step, track by track

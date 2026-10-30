@@ -16,7 +16,7 @@ from app.ui.layout import empty_state, page_header
 user = require_user()
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def load():
     with session_scope() as session:
         return quotes_frame(session)
@@ -46,13 +46,13 @@ m[3].metric(f"Accepted in FY {fy_label(today)}", inr(won["Value excl. GST"].sum(
 with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
     statuses = st.multiselect("Status", ["Draft", "Sent", "Expired", "Accepted", "Superseded", "Cancelled"],
                               default=["Draft", "Sent", "Expired"], key="q_status", width=420)
-    search = st.text_input("Institution", placeholder="Search", icon=":material/search:", key="q_search", width=300)
+    search = st.text_input("Organisation", placeholder="Search", icon=":material/search:", key="q_search", width=300)
 view = quotes[quotes["Status"].isin(statuses)] if statuses else quotes
 if search:
-    view = view[view["Institution"].str.contains(search, case=False, regex=False)]
+    view = view[view["Organisation"].str.contains(search, case=False, regex=False)]
 
 event = st.dataframe(
-    view[["Quote", "Institution", "Deal", "Status", "Value excl. GST", "Total incl. GST", "Date", "Valid until",
+    view[["Quote", "Organisation", "Deal", "Status", "Value excl. GST", "Total incl. GST", "Date", "Valid until",
           "Days left", "By"]],
     hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row", key="q_table",
     height=min(440, 35 * (len(view) + 1) + 3),

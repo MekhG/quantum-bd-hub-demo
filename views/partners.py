@@ -1,5 +1,5 @@
 """Partners and deal registration: resellers, distribution, referral, training and technology partners; the deals they
-register for institutions; the overlap check; and admin approval that locks the institution to the partner."""
+register for organisations; the overlap check; and admin approval that locks the organisation to the partner."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _me(session) -> User:
     return session.get(User, user.id)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> dict:
     with session_scope() as session:
         orgs = list(session.execute(select(Organisation.id, Organisation.name, Organisation.city)
@@ -72,13 +72,13 @@ def _choices() -> dict:
         }
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _partners() -> pd.DataFrame:
     with session_scope() as session:
         return partners_frame(session)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _registrations() -> pd.DataFrame:
     with session_scope() as session:
         return registrations_frame(session)
@@ -141,7 +141,7 @@ def partner_dialog(partner_id: int | None = None) -> None:
         contact_id = st.selectbox("Main contact", ids, format_func=label.get,
                                   index=ids.index(p.get("contact_id")) if p.get("contact_id") in ids else 0)
     elif current:
-        st.caption("Add the partner's people on the Contacts page (institution = the partner) to pick a main contact.")
+        st.caption("Add the partner's people on the Contacts page (organisation = the partner) to pick a main contact.")
     terms = st.text_area("Payment terms", value=p.get("payment_terms", ""), height=68,
                          placeholder="e.g. 50% with PO, 50% on delivery; partner margin as per price list")
     notes = st.text_area("Notes", value=p.get("notes", ""), height=68)
@@ -172,10 +172,10 @@ def register_dialog(partner_id: int | None = None) -> None:
     partner = st.selectbox("Partner", ids, format_func=names.get,
                            index=ids.index(partner_id) if partner_id in ids else 0)
     st.caption("Registered on the partner's behalf, from their email or call. An admin approves it; once approved "
-               f"the institution is theirs for {c['lock_days']} days.")
+               f"the organisation is theirs for {c['lock_days']} days.")
     with session_scope() as session:
         partner_org = partner_detail(session, partner)["org_id"]
-    org_id, new_name = _org_picker("Institution", "reg_org", exclude=partner_org)
+    org_id, new_name = _org_picker("Organisation", "reg_org", exclude=partner_org)
     if org_id:
         with session_scope() as session:
             overlap = check_overlap(session, org_id, partner)
@@ -188,7 +188,7 @@ def register_dialog(partner_id: int | None = None) -> None:
                                  placeholder="What they're proposing")
     a, b = st.columns(2)
     value = a.text_input("Expected value (₹, excl. GST)", placeholder="e.g. 12,50,000")
-    contact = b.text_input("Their contact at the institution", placeholder="Name and role, e.g. Dr. Rao, HoD Physics")
+    contact = b.text_input("Their contact at the organisation", placeholder="Name and role, e.g. Dr. Rao, HoD Physics")
     notes = st.text_area("Notes", height=68, placeholder="Stage of discussion, timeline, budget source…")
     if st.button("Register", type="primary", icon=":material/how_to_reg:", disabled=not user.can("member")):
         try:
@@ -215,7 +215,7 @@ def pending_cards(pending: pd.DataFrame) -> None:
         with card(f"reg-{rid}", tone="plain"):
             value = inr(row["Expected value (₹)"], decimals=False) if pd.notna(row["Expected value (₹)"]) else ""
             html_block(f'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'
-                       f'<div><b>{esc(row["Institution"])}</b> <span class="qa-muted">via</span> '
+                       f'<div><b>{esc(row["Organisation"])}</b> <span class="qa-muted">via</span> '
                        f'<b>{esc(row["Partner"])}</b></div>'
                        f'{chips([("Waiting", "orange"), row["Registered"].strftime("%d %b %Y"), value])}</div>'
                        + (f'<div class="qa-small">{esc(row["Products"])}</div>' if row["Products"] else "")
@@ -315,7 +315,7 @@ def _rupees(frame: pd.DataFrame) -> pd.DataFrame:
 head, tools = st.columns([3.2, 2], vertical_alignment="bottom")
 with head:
     page_header("Partners", "Resellers, distribution, referral, training and technology partners — and the deals they "
-                "register, so two partners (or a partner and us) never chase the same institution.",
+                "register, so two partners (or a partner and us) never chase the same organisation.",
                 eyebrow="Pipeline")
 with tools, st.container(horizontal=True, horizontal_alignment="right", gap="small"):
     if st.button("Register a deal", icon=":material/how_to_reg:", disabled=not user.can("member")):
@@ -374,5 +374,5 @@ with tab_regs:
                      column_config=_reg_columns())
         st.download_button("Registrations (Excel)", data=frame_to_xlsx(shown, "Deal registrations"),
                            icon=":material/download:", file_name=f"deal-registrations-{today.isoformat()}.xlsx")
-        html_block(f'<div class="qa-small qa-muted">{chip("Approved", "green")} locks the institution to the partner; '
+        html_block(f'<div class="qa-small qa-muted">{chip("Approved", "green")} locks the organisation to the partner; '
                    'when the lead is won or lost the registration follows, and it expires after the lock period.</div>')

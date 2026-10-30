@@ -59,20 +59,20 @@ def _done(message: str, kind: str = "success") -> None:
     st.rerun()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _tracks() -> list[tuple[int, str]]:
     with session_scope() as session:
         return [(t.id, t.name) for t in session.scalars(select(Track).where(Track.is_active.is_(True))
                                                          .order_by(Track.sort_order))]
 
 
-@st.cache_data(ttl=120, show_spinner="Drawing…")
+@st.cache_data(ttl=3600, show_spinner="Drawing…")
 def _gtm(track_ids: tuple[int, ...], live: bool) -> str:
     with session_scope() as session:
         return gtm_outline(session, list(track_ids) or None, live=live)
 
 
-@st.cache_data(ttl=600, show_spinner=False, max_entries=64)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=64)
 def _draw(outline: str, fmt: str) -> bytes:
     return render(parse_outline(outline), fmt)
 
@@ -232,7 +232,7 @@ def builder_tab() -> None:
 # ---------------------------------------------------------------- comparison
 
 
-@st.cache_data(ttl=120, show_spinner="Working out the numbers…")
+@st.cache_data(ttl=600, show_spinner="Working out the numbers…")
 def _comparison(period: str, grouping: str):
     start, end = period_range(period)
     with session_scope() as session:
@@ -248,13 +248,14 @@ def comparison_tab() -> None:
                                  default=["Leads", "Contacted", "Replied", "Demos", "Won", "Won value (₹)"],
                                  key="cmp_metrics")
     frame, start, end = _comparison(period, grouping)
-    st.caption(f"Public/private comes from the institution's management; urban/rural from its area. Leads = all "
-               f"leads now; everything else = {start:%d %b %Y} to {end:%d %b %Y}. Institutions without these "
-               "details are under Not set — fill them in on Colleges to sharpen the picture.")
+    st.caption(f"Industry comes from each organisation; public/private from its management and urban/rural from its "
+               f"area (both education-only). Leads = all "
+               f"leads now; everything else = {start:%d %b %Y} to {end:%d %b %Y}. Organisations without these "
+               "details are under Not set — fill them in on Organisations to sharpen the picture.")
     if frame.empty:
         st.info("No leads yet.")
         return
-    title = f"Institute categories — {period}"
+    title = f"{grouping} — {period}"
     png = comparison_chart(frame, metrics, title, "png")
     picture(png, f"{title}: bar charts of {', '.join(metrics)} for each category. The same numbers are in the "
                  "table below.", title)
@@ -262,7 +263,7 @@ def comparison_tab() -> None:
     shown["Won value (₹)"] = shown["Won value (₹)"].map(lambda v: inr(v, decimals=False))
     shown["Win rate"] = shown["Win rate"].map(lambda v: f"{v:.0%}")
     st.dataframe(shown, hide_index=True, width="stretch")
-    stem = f"institute-categories-{date.today().isoformat()}"
+    stem = f"segments-{date.today().isoformat()}"
     with st.container(horizontal=True, gap="small"):
         st.download_button("PNG", data=png, file_name=f"{stem}.png", icon=":material/image:", key="cmp_png",
                            on_click="ignore", mime="image/png")
@@ -281,8 +282,8 @@ if "gtm_pending_title" in st.session_state:  # a widget's value can only be set 
     st.session_state["gtm_title"] = st.session_state.pop("gtm_pending_title")
 
 page_header("GTM charts", "The go-to-market map drawn from your cadences, diagrams for partner and reseller models, "
-            "and how institute categories compare. Download any of them as PNG, SVG or PDF.", eyebrow="Marketing")
-map_view, builder_view, compare_view = st.tabs(["GTM map", "Diagram builder", "Institute categories"])
+            "and how industries and institute categories compare. Download any of them as PNG, SVG or PDF.", eyebrow="Marketing")
+map_view, builder_view, compare_view = st.tabs(["GTM map", "Diagram builder", "Compare segments"])
 with map_view:
     map_tab()
 with builder_view:

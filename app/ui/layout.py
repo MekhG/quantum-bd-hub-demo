@@ -30,13 +30,14 @@ _ROLE_LABEL = {"admin": "Admin", "member": "Member", "viewer": "Viewer"}
 # Stage pill colours follow the stage's outcome (a config value), so renaming or adding stages needs no code.
 _OUTCOME_COLOUR = {"open": "blue", "won": "green", "nurture": "orange", "lost": "red"}
 
-_KIND_ICON = {"lead": ":material/target:", "contact": ":material/person:", "college": ":material/account_balance:"}
+_KIND_ICON = {"lead": ":material/target:", "contact": ":material/person:", "org": ":material/domain:"}
 _ALERT_ICON = {"handoff": ":material/forward:", "query": ":material/schedule:", "ghost": ":material/help:"}
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def load_shell_counts(user_id: int, user_name: str) -> ShellCounts:
-    """Badges and alerts. Cached briefly; any save clears the cache (st.cache_data.clear) so they refresh."""
+    """Badges and alerts. Cached for two minutes (some alerts depend on the clock); any save anywhere clears
+    every cache (see app/db.py), so they never lag behind an edit."""
     with session_scope() as session:
         return shell_counts(session, user_id, user_name)
 
@@ -102,7 +103,7 @@ def render_shell(user: CurrentUser, counts: ShellCounts) -> None:
                 st.page_link(page, label=label, icon=icon_name, query_params=params)
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def _search(text: str) -> tuple[list[Hit], list[tuple[str, str, str]]]:
     from app.services.library import search_library
 
@@ -114,7 +115,7 @@ def _search(text: str) -> tuple[list[Hit], list[tuple[str, str, str]]]:
 def _search_box() -> None:
     # A fragment, so typing reruns only the search results, not the whole page underneath.
     text = st.text_input("Search the hub", key="global_q", type="search", live="400ms",
-                         placeholder="Search leads, contacts, colleges or AISHE code…",
+                         placeholder="Search leads, contacts, organisations or AISHE code…",
                          label_visibility="collapsed", icon=":material/search:")
     text = (text or "").strip()
     if len(text) < MIN_CHARS:
@@ -124,7 +125,7 @@ def _search_box() -> None:
         if not hits and not library:
             st.caption(f"Nothing matches “{text}”. Try part of a name, an email or an AISHE code.")
             return
-        for kind, heading in (("lead", "Leads"), ("contact", "Contacts"), ("college", "Colleges (not yet leads)")):
+        for kind, heading in (("lead", "Leads"), ("contact", "Contacts"), ("org", "Organisations (not yet leads)")):
             group = [h for h in hits if h.kind == kind]
             if not group:
                 continue
@@ -138,7 +139,7 @@ def _search_box() -> None:
                     st.page_link("views/contacts.py", label=label, icon=_KIND_ICON[kind],
                                  query_params={"q": hit.query or hit.title}, width="stretch")
                 else:
-                    st.page_link("views/colleges.py", label=label, icon=_KIND_ICON[kind],
+                    st.page_link("views/organisations.py", label=label, icon=_KIND_ICON[kind],
                                  query_params={"q": hit.query or hit.title}, width="stretch")
         if library:
             html_block('<div class="qa-eyebrow" style="margin-top:0.2rem">Library</div>')
@@ -232,6 +233,28 @@ def stage_pills(frame: pd.DataFrame, stages: pd.DataFrame) -> tuple[pd.DataFrame
     shown["Stage"] = shown["Stage"].map(lambda s: [s] if isinstance(s, str) and s else [])
     config = st.column_config.MultiselectColumn("Stage", options=names, color=colours, disabled=True)
     return shown, config
+
+
+NOT_SET = "Not set"
+
+
+def _industry_values(frame: pd.DataFrame, column: str) -> pd.Series:
+    return frame[column].fillna("").replace("", NOT_SET)
+
+
+def industry_filter(frame: pd.DataFrame, *, key: str, column: str = "Industry") -> list[str]:
+    """Industry chips with counts, biggest first; pick any number. Returns the picked industries."""
+    if column not in frame or frame.empty:
+        return []
+    counts = _industry_values(frame, column).value_counts()
+    picked = st.pills("Industry", list(counts.index), selection_mode="multi", key=key,
+                      format_func=lambda value: f"{value} · {counts.get(value, 0)}",
+                      help="Industries come from Configuration → Lists, so the admin can add new ones.")
+    return list(picked or [])
+
+
+def filter_industry(frame: pd.DataFrame, picked: list[str], column: str = "Industry") -> pd.DataFrame:
+    return frame[_industry_values(frame, column).isin(picked)] if picked else frame
 
 
 def as_list_column(frame: pd.DataFrame, column: str, sep: str = ", ") -> pd.DataFrame:

@@ -256,8 +256,8 @@ class DealData:
 
 
 def suggest_route(management: str | None) -> str | None:
-    """Demo is not on GeM, so government institutions buy through the
-    proprietary-article (PAC) route, starting with a GeM non-availability certificate. Private institutions issue a
+    """Demo is not on GeM, so government organisations buy through the
+    proprietary-article (PAC) route, starting with a GeM non-availability certificate. Private organisations issue a
     direct purchase order."""
     text = (management or "").lower()
     if "government" in text or "central" in text or "state" in text or "local body" in text:
@@ -470,7 +470,7 @@ def institution_code(name: str | None) -> str:
 
 
 def next_quote_number(session: Session, prefix: str, on: date, code: str = "INST") -> str:
-    """DEMO/SVU/2026-27/001 — the running number is per financial year across all institutions."""
+    """DEMO/SVU/2026-27/001 — the running number is per financial year across all organisations."""
     fy = fy_label(on)
     code = re.sub(r"[^A-Z0-9-]", "", (code or "INST").upper())[:12] or "INST"
     numbers = session.scalars(select(Quote.number).where(Quote.number.like(f"{prefix}/%/{fy}/%"))).all()
@@ -785,14 +785,14 @@ def quotes_frame(session: Session, today: date | None = None) -> pd.DataFrame:
         .order_by(Quote.quote_date.desc(), Quote.number.desc(), Quote.version.desc())
     ).all()
     return pd.DataFrame([{
-        "id": q.id, "lead_id": lead_id, "Quote": f"{q.number} v{q.version}", "Institution": q.to_institution or "",
+        "id": q.id, "lead_id": lead_id, "Quote": f"{q.number} v{q.version}", "Organisation": q.to_institution or "",
         "Deal": deal, "Status": q.status.title(), "Value excl. GST": float(q.subtotal_inr - q.discount_inr),
         "Total incl. GST": float(q.total_inr), "Basis": q.price_basis.title(),
         "Date": q.quote_date, "Valid until": q.valid_until,
         "Days left": (q.valid_until - today).days if q.status == "sent" else None,
         "Potential": potential or "", "By": by or "",
     } for q, deal, lead_id, potential, by in rows],
-        columns=["id", "lead_id", "Quote", "Institution", "Deal", "Status", "Value excl. GST", "Total incl. GST",
+        columns=["id", "lead_id", "Quote", "Organisation", "Deal", "Status", "Value excl. GST", "Total incl. GST",
                  "Basis", "Date",
                  "Valid until", "Days left", "Potential", "By"])
 
@@ -848,7 +848,7 @@ def quote_docx(session: Session, quote_id: int) -> tuple[bytes, str]:
                                                                              if quote.version > 1 else ""),
         "date": quote.quote_date.strftime("%d/%m/%Y"), "validity": f"{days} days from date of issue",
         "valid_days": str(days), "prepared_by": quote.prepared_by or "", "greeting": quote.greeting or "Dear Sir/Madam,",
-        "institution": quote.to_institution or "your institution",
+        "institution": quote.to_institution or "your organisation",
         "signature_name": (quote.prepared_by or "").split(",")[0],
         "signature_title": ", ".join(x.strip() for x in (quote.prepared_by or "").split(",")[1:]),
     }

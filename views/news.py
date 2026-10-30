@@ -1,4 +1,4 @@
-"""News & signals: free news searches and feeds matched to our leads, the signals saved against institutions, and
+"""News & signals: free news searches and feeds matched to our leads, the signals saved against organisations, and
 adding signals by hand, from a pasted list or from a sheet."""
 
 from __future__ import annotations
@@ -53,9 +53,9 @@ def _done(text: str, kind: str = "success") -> None:
     st.rerun()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> tuple[dict[str, int], list[tuple[int, str]], list[str]]:
-    """Lead institutions as 'label → id' (labels made unique), signal types, topics."""
+    """Lead organisations as 'label → id' (labels made unique), signal types, topics."""
     with session_scope() as session:
         orgs = lead_orgs(session)
         seen: dict[str, int] = {}
@@ -65,13 +65,13 @@ def _choices() -> tuple[dict[str, int], list[tuple[int, str]], list[str]]:
         return labels, [(t.id, t.name) for t in manual_types(session)], news_topics(session)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def _items(statuses: tuple[str, ...], topics: tuple[str, ...], leads_only: bool, text: str) -> list[dict]:
     with session_scope() as session:
         return news_items(session, statuses=statuses, topics=topics, leads_only=leads_only, text=text, limit=300)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _signals(include_faded: bool) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     with session_scope() as session:
         return signals_frame(session, include_faded=include_faded), hot_leads(session, limit=15), hot_score(session)
@@ -114,11 +114,11 @@ def signal_dialog(item: dict) -> None:
     st.markdown(f"**{item['title']}**")
     st.caption(" · ".join(x for x in (item["publisher"], item["published"].strftime("%d %b %Y")
                                        if item["published"] else "") if x))
-    picked = st.multiselect("Institutions", list(labels), default=[by_id[m[0]] for m in item["matched"]
+    picked = st.multiselect("Organisations", list(labels), default=[by_id[m[0]] for m in item["matched"]
                                                                      if m[0] in by_id],
                             placeholder="Search our leads by name",
-                            help="Only institutions that are leads are listed. The signal counts for every lead "
-                                 "the institution has.")
+                            help="Only organisations that are leads are listed. The signal counts for every lead "
+                                 "the organisation has.")
     ids = [tid for tid, _ in types]
     suggested = item["suggested_type_id"]
     kind = st.selectbox("Signal", ids, format_func=dict(types).get,
@@ -134,7 +134,7 @@ def signal_dialog(item: dict) -> None:
         except (NewsError, SignalError, PermissionError) as error:
             st.error(str(error))
             return
-        _done(f"Signal saved for {added} institution(s); their lead scores are updated.")
+        _done(f"Signal saved for {added} organisation(s); their lead scores are updated.")
 
 
 # ---------------------------------------------------------------- news cards
@@ -254,7 +254,7 @@ def signals_tab() -> None:
             st.caption("Open leads with the highest scores — they also rise to the top of Today.")
             with st.container(horizontal=True, gap="small"):
                 for row in hot.to_dict("records"):
-                    st.page_link("views/leads.py", label=f"{row['Institution']} · {row['Score']}",
+                    st.page_link("views/leads.py", label=f"{row['Organisation']} · {row['Score']}",
                                  query_params={"lead": int(row["lead_id"])}, icon=":material/local_fire_department:",
                                  help=f"{row['Track']} · {row['Stage']}" + (f" · {row['Owner']}" if row["Owner"]
                                                                              else ""))
@@ -262,7 +262,7 @@ def signals_tab() -> None:
         st.caption("No signals saved yet. Save one from a news item, from a lead's Signals card, or under "
                    "Add signals.")
         return
-    columns = ["Institution", "Signal", "Points now", "Seen on", "Counts until", "Source", "Note", "Added by"]
+    columns = ["Organisation", "Signal", "Points now", "Seen on", "Counts until", "Source", "Note", "Added by"]
     event = st.dataframe(
         signals[columns], hide_index=True, width="stretch", on_select="rerun", selection_mode="multi-row",
         key="sig_table", height=min(480, 35 * (len(signals) + 1) + 3),
@@ -296,27 +296,27 @@ def signals_tab() -> None:
 
 
 def _review(frame: pd.DataFrame, labels: dict[str, int], types: list[tuple[int, str]]) -> None:
-    """The match review: fix any institution the hub matched wrongly, untick rows to leave out, save."""
+    """The match review: fix any organisation the hub matched wrongly, untick rows to leave out, save."""
     type_names = [name for _, name in types]
     edited = st.data_editor(
         frame, hide_index=True, width="stretch", key="sig_review_grid",
         disabled=["As written", "Match"],
         column_config={
             "Include": st.column_config.CheckboxColumn(width="small"),
-            "Institution": st.column_config.SelectboxColumn(options=list(labels), width="large",
+            "Organisation": st.column_config.SelectboxColumn(options=list(labels), width="large",
                                                             help="Pick the right lead if the match is wrong."),
             "Signal": st.column_config.SelectboxColumn(options=type_names, required=True),
             "Seen on": st.column_config.DateColumn(format="DD/MM/YYYY", max_value=today_ist(), required=True),
             "Source link": st.column_config.LinkColumn(),
         })
-    ready = edited[edited["Include"] & edited["Institution"].notna() & (edited["Institution"] != "")]
+    ready = edited[edited["Include"] & edited["Organisation"].notna() & (edited["Organisation"] != "")]
     with st.container(horizontal=True, gap="small", vertical_alignment="center"):
         if st.button(f"Save {len(ready)} signal(s)", type="primary", icon=":material/save:", disabled=ready.empty,
                      key="sig_review_save"):
             type_ids = {name: tid for tid, name in types}
-            rows = [{"org_id": labels[r["Institution"]], "type_id": type_ids[r["Signal"]],
+            rows = [{"org_id": labels[r["Organisation"]], "type_id": type_ids[r["Signal"]],
                      "observed_on": pd.Timestamp(r["Seen on"]).date(), "source_url": r["Source link"] or None,
-                     "note": r["Note"] or None, "label": r["Institution"]} for r in ready.to_dict("records")]
+                     "note": r["Note"] or None, "label": r["Organisation"]} for r in ready.to_dict("records")]
             with session_scope() as session:
                 added, already, problems = save_signal_rows(session, rows, session.get(User, user.id))
             st.session_state.pop("sig_review", None)
@@ -346,16 +346,16 @@ def add_tab() -> None:
     one, many = st.columns(2, gap="large")
     type_ids = [tid for tid, _ in types]
     with one, card("sig-one"):
-        st.markdown("**One institution**")
+        st.markdown("**One organisation**")
         with st.form("sig_one_form", clear_on_submit=True, border=False):
-            org = st.selectbox("Institution", list(labels), index=None, placeholder="Search our leads by name")
+            org = st.selectbox("Organisation", list(labels), index=None, placeholder="Search our leads by name")
             kind = st.selectbox("Signal", type_ids, format_func=dict(types).get)
             seen = st.date_input("Seen on", value=today_ist(), max_value=today_ist(), format="DD/MM/YYYY")
             url = st.text_input("Source link (optional)", placeholder="https://…")
             note = st.text_input("Note (optional)")
             if st.form_submit_button("Save signal", type="primary", icon=":material/bolt:"):
                 if not org:
-                    st.error("Pick an institution.")
+                    st.error("Pick an organisation.")
                 else:
                     with session_scope() as session:
                         added, _, problems = save_signal_rows(
@@ -367,8 +367,8 @@ def add_tab() -> None:
                         _done("Signal saved; the lead score is updated." if added else "That signal was already "
                               "saved.")
     with many, card("sig-many"):
-        st.markdown("**A list of institutions**")
-        st.caption("For example, the institutions named in a PIB release. Paste one name per line, or upload a "
+        st.markdown("**A list of organisations**")
+        st.caption("For example, the organisations named in a PIB release. Paste one name per line, or upload a "
                    "sheet. You'll check the matches before anything is saved.")
         kind = st.selectbox("Signal", type_ids, format_func=dict(types).get, key="sig_many_type")
         c1, c2 = st.columns(2)
@@ -378,21 +378,21 @@ def add_tab() -> None:
         note = st.text_input("Note (optional)", key="sig_many_note")
         pasted, uploaded = st.tabs(["Paste names", "Upload a sheet"])
         with pasted:
-            text = st.text_area("Institutions, one per line", height=150, key="sig_many_text",
+            text = st.text_area("Organisations, one per line", height=150, key="sig_many_text",
                                 placeholder="Omega University\nIIT Kalpaka\n…")
             # Never disabled: a text area only reports its text when it loses focus, so a button that waits for the
             # text would swallow the first click.
-            go_paste = st.button("Find these institutions", key="sig_many_find")
+            go_paste = st.button("Find these organisations", key="sig_many_find")
         with uploaded:
             file = st.file_uploader("Sheet (.xlsx or .csv, up to 2 MB)", type=["xlsx", "csv"], key="sig_many_file")
             st.download_button("Download the template", data=signal_sheet_template(),
                                file_name="signals-template.xlsx", icon=":material/download:", type="tertiary")
-            st.caption("Columns: Institution (required), Signal, Seen on, Source link, Note. Blank cells use the "
+            st.caption("Columns: Organisation (required), Signal, Seen on, Source link, Note. Blank cells use the "
                        "choices above.")
             go_file = st.button("Read the sheet", key="sig_many_read")
         sheet = None
         if go_paste and not text.strip():
-            st.warning("Paste at least one institution name.")
+            st.warning("Paste at least one organisation name.")
             go_paste = False
         if go_file and file is None:
             st.warning("Choose a sheet to upload first.")
@@ -402,7 +402,7 @@ def add_tab() -> None:
             except SignalError as error:
                 st.error(str(error))
         if go_paste or sheet is not None:
-            names = sheet["Institution"].tolist() if sheet is not None else text.splitlines()
+            names = sheet["Organisation"].tolist() if sheet is not None else text.splitlines()
             with session_scope() as session:
                 matches = match_names(session, names)
             by_id = {oid: label for label, oid in labels.items()}
@@ -414,7 +414,7 @@ def add_tab() -> None:
                 when = pd.to_datetime(extra.get("Seen on") or None, errors="coerce", dayfirst=True)
                 rows.append({
                     "Include": m.org_id is not None, "As written": m.pasted, "Match": m.how,
-                    "Institution": by_id.get(m.org_id),
+                    "Organisation": by_id.get(m.org_id),
                     "Signal": extra.get("Signal") if extra.get("Signal") in valid_types else default_type,
                     "Seen on": min(when.date(), today_ist()) if not pd.isna(when) else seen,
                     "Source link": (extra.get("Source link") or url or "").strip(),

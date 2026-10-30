@@ -233,7 +233,7 @@ def test_score_adds_signals_once_per_type_and_auto_points(seeded: Session) -> No
     assert 14 <= by_name["Replied recently"][0] <= 15
     expected = 30 + by_name["Funding / grant"][0] + 20 + by_name["Replied recently"][0]
     assert seeded.get(Lead, lead.id).score == expected
-    assert hot_leads(seeded)["Institution"].tolist() == ["Omega University"]
+    assert hot_leads(seeded)["Organisation"].tolist() == ["Omega University"]
 
     # Automatic types can't be added by hand; future dates are refused.
     with pytest.raises(SignalError):
@@ -287,7 +287,7 @@ def test_signal_lists_and_bulk_paste(seeded: Session) -> None:
     seeded.commit()
     assert (added, already) == (2, 0)
     frame = signals_frame(seeded)
-    assert set(frame["Institution"]) == {"Omega University", "Indian Institute of Technology Kalpaka"}
+    assert set(frame["Organisation"]) == {"Omega University", "Indian Institute of Technology Kalpaka"}
     assert frame["Points now"].tolist() == [30, 30]
     assert seeded.get(Lead, omega.id).score == 30
 

@@ -23,13 +23,13 @@ STATUS_ORDER = ["Reply overdue", "Awaiting reply", "Following up", "In conversat
                 "Client", "Closed", "Not linked to a lead"]
 
 
-@st.cache_data(ttl=30, show_spinner="Loading queries…")
+@st.cache_data(ttl=120, show_spinner="Loading queries…")
 def load(days: int) -> pd.DataFrame:
     with session_scope() as session:
         return queries_frame(session, days=days)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def lookups() -> tuple[list[tuple[int, str]], list[str], list[tuple[int, str]]]:
     with session_scope() as session:
         team = [(u.id, u.name) for u in session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id))]
@@ -61,8 +61,8 @@ def new_query_dialog() -> None:
     phone = p1.text_input("Phone / WhatsApp")
     interest = p2.multiselect("Interested in", products, placeholder="Pick products (optional)")
 
-    st.markdown("**Institution**")
-    org_mode = st.radio("Institution", ["Already in the hub", "New institution", "Individual"], horizontal=True,
+    st.markdown("**Organisation**")
+    org_mode = st.radio("Organisation", ["Already in the hub", "New organisation", "Individual"], horizontal=True,
                         label_visibility="collapsed", key="nq_org_mode")
     org_id = new_org = state = None
     if org_mode == "Already in the hub":
@@ -70,12 +70,12 @@ def new_query_dialog() -> None:
                                key="nq_search")
         with session_scope() as session:
             matches = institution_choices(session, search)
-        org_id = st.selectbox("Pick the institution", [m[0] for m in matches], format_func=dict(matches).get,
+        org_id = st.selectbox("Pick the organisation", [m[0] for m in matches], format_func=dict(matches).get,
                               index=0 if len(matches) == 1 else None, placeholder="Choose from the matches",
                               key=f"nq_org_{search.strip().lower()}", disabled=not matches)
-    elif org_mode == "New institution":
+    elif org_mode == "New organisation":
         n1, n2 = st.columns([2, 1])
-        new_org = n1.text_input("Institution name")
+        new_org = n1.text_input("Organisation name")
         state = n2.text_input("State (optional)")
     else:
         st.caption("Saved as an individual — e.g. a researcher or professional asking about a Mini product.")
@@ -138,7 +138,7 @@ m[3].metric("Typical first reply", f"{replied_hours.median():.0f} h" if not repl
 
 with st.container(border=True):
     f1, f2, f3 = st.columns([2, 1.3, 1.3])
-    search = f1.text_input("Search", placeholder="Name, email, institution or message", icon=":material/search:")
+    search = f1.text_input("Search", placeholder="Name, email, organisation or message", icon=":material/search:")
     present = [s for s in STATUS_ORDER if s in set(queries["Status"])] + \
         sorted(s for s in set(queries["Status"]) if s not in STATUS_ORDER)
     statuses = f2.multiselect("Status", present, placeholder="All statuses")
@@ -147,7 +147,7 @@ with st.container(border=True):
 view = queries
 if search:
     needle = search.lower()
-    text = (view["From"] + " " + view["Email"] + " " + view["Institution"] + " " + view["Message"]).str.lower()
+    text = (view["From"] + " " + view["Email"] + " " + view["Organisation"] + " " + view["Message"]).str.lower()
     view = view[text.str.contains(needle, regex=False)]
 if statuses:
     view = view[view["Status"].isin(statuses)]
@@ -156,7 +156,7 @@ if channels:
 view = view.assign(_rank=view["Status"].map({s: i for i, s in enumerate(STATUS_ORDER)}).fillna(99)) \
     .sort_values(["_rank", "Received"], ascending=[True, False]).drop(columns="_rank")
 
-columns = ["Status", "Received", "Channel", "From", "Institution", "Email", "Phone", "Message", "Track", "Stage",
+columns = ["Status", "Received", "Channel", "From", "Organisation", "Email", "Phone", "Message", "Track", "Stage",
            "First reply after (h)", "Owner"]
 event = st.dataframe(
     view[columns], hide_index=True, width="stretch", height=min(480, 35 * (len(view) + 1) + 3),
@@ -178,7 +178,7 @@ if not picked:
 
 row = view.iloc[picked[0]]
 with st.container(border=True):
-    st.subheader(f"{row['From'] or row['Email']} · {row['Institution']}", anchor=False)
+    st.subheader(f"{row['From'] or row['Email']} · {row['Organisation']}", anchor=False)
     st.caption(f"{row['Channel']} query · received {row['Received'].strftime('%d %b %Y, %H:%M')} · "
                f"status **{row['Status']}** · owner {row['Owner'] or '—'}")
     reach = [x for x in (f"[{row['Email']}](mailto:{row['Email']})" if row["Email"] else "",

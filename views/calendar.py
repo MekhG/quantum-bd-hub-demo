@@ -22,7 +22,7 @@ FLASH = "edit_flash"
 WINDOW_BACK, WINDOW_AHEAD = 60, 120  # days of activities loaded around today
 
 
-@st.cache_data(ttl=30, show_spinner="Loading the calendar…")
+@st.cache_data(ttl=300, show_spinner="Loading the calendar…")
 def load(owner_id: int | None, types: tuple[str, ...], include_done: bool) -> list[dict]:
     today = datetime.now(IST).date()
     with session_scope() as session:
@@ -30,7 +30,7 @@ def load(owner_id: int | None, types: tuple[str, ...], include_done: bool) -> li
                                owner_id=owner_id, types=list(types) or None, include_done=include_done)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def lookups() -> tuple[list[tuple[int, str]], list[str]]:
     with session_scope() as session:
         return team_users(session), loggable_types(session)
@@ -125,7 +125,7 @@ st.subheader("Agenda — next 14 days", anchor=False)
 today = datetime.now(IST).date()
 agenda = pd.DataFrame([
     {"When": pd.Timestamp(e["start"]), "What": e["extendedProps"]["type"], "Task": e["extendedProps"]["task"],
-     "Institution": e["extendedProps"]["institution"], "For": e["extendedProps"]["owner"],
+     "Organisation": e["extendedProps"]["institution"], "For": e["extendedProps"]["owner"],
      "Status": e["extendedProps"]["status"].title(), "id": e["extendedProps"]["activity_id"]}
     for e in events
 ])

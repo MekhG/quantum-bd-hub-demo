@@ -113,6 +113,20 @@ TRACKS: tuple[TrackSpec, ...] = (
         ),
     ),
     TrackSpec(
+        code="enterprise",
+        name="Enterprise & public sector",
+        goal="Run a paid quantum upskilling pilot for one engineering team",
+        sender_mailbox="enterprise@demo.example",
+        notes="Companies, PSUs and public bodies that want their engineers trained on quantum computing and "
+              "quantum-safe networking. Industry decides the use-case note in step 3.",
+        steps=(
+            StepSpec("Intro", 0, 1, ("LinkedIn message", "Email")),
+            StepSpec("Discovery call", 3, 2, ("Phone call",)),
+            StepSpec("Use-case note", 5, 2, ("Email",)),
+            StepSpec("Last follow-up", 7, 3, ("Email", "Phone call"), complete_on_any=True),
+        ),
+    ),
+    TrackSpec(
         code="inbound_queries",
         name="Website enquiries",
         goal="Answer the same day, then qualify and move the lead to the right track",
@@ -205,9 +219,34 @@ OPTION_LISTS: dict[str, tuple[tuple[str, list[str]], ...]] = {
         ("70-90%", ["70-90", "70 to 90%"]),
         ("100%", ["100"]),
     ),
+    # What sector an organisation works in. Filters Organisations, Contacts and Leads; add rows to add industries.
+    "industry": (
+        ("Higher education", ["university", "college", "higher ed", "academia", "education"]),
+        ("School education", ["school", "k-12", "k12", "schools"]),
+        ("Research & development", ["research", "r&d", "research lab", "laboratory", "research institute"]),
+        ("Government & public sector", ["government", "govt", "public sector", "psu", "ministry", "state body"]),
+        ("IT & software", ["it", "software", "it services", "technology", "saas", "information technology"]),
+        ("Telecom", ["telecommunications", "telco", "networking"]),
+        ("Banking & finance", ["bfsi", "banking", "finance", "financial services", "fintech", "insurance"]),
+        ("Defence & aerospace", ["defence", "defense", "aerospace", "space"]),
+        ("Manufacturing", ["industrial", "engineering", "electronics manufacturing", "semiconductors"]),
+        ("Healthcare & pharma", ["healthcare", "pharma", "pharmaceutical", "life sciences", "biotech"]),
+        ("Energy & utilities", ["energy", "utilities", "power", "oil and gas"]),
+        ("EdTech", ["ed tech", "e-learning", "online learning", "edtech platform"]),
+        ("Distribution & resellers", ["distributor", "reseller", "lab supplies", "channel partner"]),
+        ("Non-profit & CSR", ["ngo", "non profit", "nonprofit", "foundation", "trust", "csr"]),
+        ("Other", []),
+    ),
     "contact_type": (
+        ("Founder/CXO", ["ceo", "cto", "coo", "cfo", "founder", "co-founder", "managing director", "md", "cxo",
+                         "chief technology officer", "chief executive officer"]),
+        ("Director/VP", ["vice president", "vp", "svp", "general manager", "gm", "head of", "business head"]),
+        ("Manager", ["senior manager", "program manager", "project manager", "team lead"]),
+        ("Engineer/Scientist", ["engineer", "senior engineer", "research scientist", "data scientist", "developer",
+                                "architect", "r&d engineer"]),
+        ("L&D/HR", ["learning and development", "l&d", "hr", "human resources", "talent", "training manager"]),
         ("Faculty", ["professor", "assistant professor", "associate professor", "asst professor",
-                     "asst. professor", "lecturer", "faculty member", "scientist"]),
+                     "asst. professor", "lecturer", "faculty member"]),
         ("HoD", ["hod", "head of department", "head of the department", "head"]),
         ("Dean", ["dean r&d", "dean research", "dean academics", "associate dean"]),
         ("Director/Principal", ["director", "principal", "vice chancellor", "vc", "pro vice chancellor"]),
@@ -233,6 +272,12 @@ OPTION_LISTS: dict[str, tuple[tuple[str, list[str]], ...]] = {
         ("Research/Innovation cell", ["r&d", "research", "innovation", "iic", "incubation", "research and development"]),
         ("Administration", ["admin", "office", "institute administration", "college administration",
                             "campus administration"]),
+        # Departments in companies and public bodies.
+        ("Engineering", ["engineering team", "technology", "cto office", "platform engineering",
+                         "product engineering"]),
+        ("Learning & Development", ["l&d", "learning and development", "training", "talent development", "academy"]),
+        ("Innovation lab", ["innovation lab", "emerging tech", "emerging technologies", "quantum team", "labs"]),
+        ("Procurement", ["purchase department", "sourcing", "vendor management"]),
         ("Other", []),
     ),
     # Who brought or works the lead.
@@ -398,12 +443,16 @@ SIGNAL_TYPES: tuple[tuple[str, str | None, int, int, list[str], str], ...] = (
      "Automatic: the lead wrote to us (fades over 3 months from the latest reply)."),
     ("NQM applicant", "nqm_applicant", 20, 12, [],
      "Automatic: the lead is flagged as an NQM applicant."),
+    ("Quantum team or programme announced", None, 20, 12,
+     ["quantum team", "quantum computing team", "quantum research lab", "quantum-safe", "quantum safe",
+      "post-quantum", "post quantum", "hiring quantum", "quantum engineers", "quantum programme", "quantum program"],
+     "A company or public body announces a quantum team, a quantum-safe migration or quantum hiring."),
     ("Event participation", None, 10, 12, [],
-     "People from the institution took part in one of our events (hackathon, workshop…). Added automatically "
+     "People from the organisation took part in one of our events (hackathon, workshop…). Added automatically "
      "from Events once the event has happened."),
 )
 # Manual types added after the first release: re-added by name to databases seeded earlier.
-_ADDED_SIGNAL_TYPES = ("Event participation",)
+_ADDED_SIGNAL_TYPES = ("Event participation", "Quantum team or programme announced")
 
 _GN_INTL = "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
 # News searches (Week 7): (name, kind, search words or RSS address, topic, only keep if it mentions).
@@ -489,6 +538,8 @@ TASK_ASSIGNMENTS: dict[str, dict[str, str]] = {
                 "Phone call": "riya@demo.example"},
     "schools": {"Email": "neha@demo.example", "Phone call": "arjun@demo.example",
             "WhatsApp message": "arjun@demo.example"},
+    "enterprise": {"LinkedIn message": "kabir@demo.example", "Email": "kabir@demo.example",
+                   "Phone call": "riya@demo.example"},
     "inbound_queries": {"Email": "riya@demo.example", "Phone call": "arjun@demo.example",
                         "WhatsApp message": "arjun@demo.example"},
     "individuals": {"Email": "kabir@demo.example", "WhatsApp message": "arjun@demo.example"},

@@ -8,7 +8,7 @@ Safety rules:
 - A row someone else changed since this table was loaded is skipped and reported (no silent overwrite).
 - Every change is written to the audit log with old → new values.
 - Stage changes are also written to the lead's timeline as a 'Stage change' activity.
-- Only admins can delete; institutions can only be deleted once they have no leads or contacts.
+- Only admins can delete; organisations can only be deleted once they have no leads or contacts.
 """
 
 from __future__ import annotations
@@ -75,7 +75,8 @@ class Field:
 # Columns that can be edited in each table. Anything else shown is read-only.
 GRID_FIELDS: dict[str, list[Field]] = {
     LEADS: [
-        Field("Institution", "org", "name", "text", required=True),
+        Field("Organisation", "org", "name", "text", required=True),
+        Field("Industry", "org", "industry", "option:industry"),
         Field("Stage", "lead", "stage", "stage", required=True),
         Field("Owner", "lead", "owner", "user"),
         Field("Tier", "org", "tier", "option:tier"),
@@ -90,6 +91,7 @@ GRID_FIELDS: dict[str, list[Field]] = {
     INSTITUTIONS: [
         Field("Name", "org", "name", "text", required=True),
         Field("Type", "org", "org_type", "org_type", required=True),
+        Field("Industry", "org", "industry", "option:industry"),
         Field("Category", "org", "category", "text"),
         Field("State", "org", "state", "state"),
         Field("Location", "org", "city", "text"),
@@ -117,7 +119,7 @@ GRID_FIELDS: dict[str, list[Field]] = {
 AREAS = ["Rural", "Urban", "Semi-urban"]
 _MAX_LEN = {"name": 255, "designation": 160, "department": 160, "category": 80, "management": 80,
             "affiliated_university": 255, "city": 80, "website": 255, "linkedin_url": 255, "phone": 40,
-            "contact_type": 60, "tier": 20, "potential": 20, "channel": 40}
+            "contact_type": 60, "industry": 80, "tier": 20, "potential": 20, "channel": 40}
 
 
 # ---------------------------------------------------------------- planning
@@ -504,7 +506,7 @@ def add_contact(session: Session, data: NewContact, user: User) -> Contact:
     choices = _Choices(session)
     org = session.get(Organisation, data.org_id)
     if org is None:
-        raise EditError("Pick an institution.")
+        raise EditError("Pick an organisation.")
     fields = {f.attr: f for f in GRID_FIELDS[CONTACTS]}
     values = {}
     for attr in ("name", "email", "phone", "designation", "contact_type", "department", "linkedin_url", "notes"):
@@ -527,7 +529,7 @@ def add_contact(session: Session, data: NewContact, user: User) -> Contact:
 
 
 def institution_choices(session: Session, search: str, limit: int = 50) -> list[tuple[int, str]]:
-    """Institutions whose name contains the search text, for the Add contact form."""
+    """Organisations whose name contains the search text, for the Add contact form."""
     text = (search or "").strip()
     if len(text) < 3:
         return []
@@ -559,7 +561,7 @@ def dropdown_values(session: Session) -> dict[str, list[str]]:
 
 
 def org_type_hint(aishe_code: str | None) -> str | None:
-    """Used by the Colleges table to suggest a type from a newly typed AISHE code."""
+    """Used by the Organisations table to suggest a type from a newly typed AISHE code."""
     code = org_type_from_aishe(aishe_code)
     return ORG_TYPE_LABELS.get(code) if code else None
 
@@ -574,7 +576,7 @@ def set_main_contact(session: Session, lead_id: int, contact_id: int, user: User
     lead = session.get(Lead, lead_id)
     contact = session.get(Contact, contact_id)
     if lead is None or contact is None or contact.org_id != lead.org_id:
-        raise EditError("Pick a contact from this institution.")
+        raise EditError("Pick a contact from this organisation.")
     old = session.get(Contact, lead.primary_contact_id).name if lead.primary_contact_id else None
     if lead.primary_contact_id == contact.id:
         return

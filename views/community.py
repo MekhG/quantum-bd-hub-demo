@@ -1,5 +1,5 @@
-"""Community: everyone who has taken part in our events — searchable by interests, level, institution and events,
-with mailing lists that respect consent, profiles, and a one-click lead for a member's institution."""
+"""Community: everyone who has taken part in our events — searchable by interests, level, organisation and events,
+with mailing lists that respect consent, profiles, and a one-click lead for a member's organisation."""
 
 from __future__ import annotations
 
@@ -37,13 +37,13 @@ def _done(message: str, kind: str = "success") -> None:
     st.rerun()
 
 
-@st.cache_data(ttl=60, show_spinner="Loading the community…")
+@st.cache_data(ttl=3600, show_spinner="Loading the community…")
 def _members() -> pd.DataFrame:
     with session_scope() as session:
         return members_frame(session)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _tracks() -> list[tuple[int, str]]:
     with session_scope() as session:
         return [(t.id, t.name) for t in session.scalars(select(Track).where(Track.is_active.is_(True))
@@ -106,7 +106,7 @@ def profile(member_id: int) -> None:
                 with st.form(f"edit_member_{member_id}", border=False):
                     name = st.text_input("Name", value=m["name"])
                     education = st.text_input("Education / profession", value=m["education"] or "")
-                    institution = st.text_input("Institution", value=m["institution"] or "")
+                    institution = st.text_input("Organisation", value=m["institution"] or "")
                     a, b = st.columns(2)
                     city = a.text_input("City", value=m["city"] or "")
                     state_in = b.text_input("State", value=m["state"] or "")
@@ -128,7 +128,7 @@ def profile(member_id: int) -> None:
             with st.popover("Create lead", icon=":material/target:", disabled=not can):
                 tracks = _tracks()
                 ids = [tid for tid, _ in tracks]
-                st.caption(f"Makes **{m['org'] or m['institution'] or 'their institution'}** a lead. Event "
+                st.caption(f"Makes **{m['org'] or m['institution'] or 'their organisation'}** a lead. Event "
                            "participation adds 10 points to its score.")
                 track = st.selectbox("Track", ids, format_func=dict(tracks).get, key=f"lead_track_{member_id}")
                 if st.button("Create lead", type="primary", key=f"lead_go_{member_id}"):
@@ -157,7 +157,7 @@ def profile(member_id: int) -> None:
                         st.session_state.pop("member_pick", None)
                         _done(f"{name} deleted.")
         if m["leads"]:
-            html_block('<div class="qa-small qa-muted" style="margin-top:6px">Their institution is a lead:</div>')
+            html_block('<div class="qa-small qa-muted" style="margin-top:6px">Their organisation is a lead:</div>')
             with st.container(horizontal=True, gap="small"):
                 for lead_id, track in m["leads"]:
                     st.page_link("views/leads.py", label=f"{m['org']} · {track}", icon=":material/target:",
@@ -191,12 +191,12 @@ m = st.columns(4)
 m[0].metric("Members", f"{len(members):,}", border=True)
 m[1].metric("Mailable", f"{int(members['Mailable'].sum()):,}", border=True,
             help="Consent + 18 or older + not on the do-not-contact list.")
-m[2].metric("Institutions", f"{members.loc[members['Institution'] != '', 'Institution'].nunique():,}", border=True)
-m[3].metric("From lead institutions", f"{int(members['Institution is a lead'].sum()):,}", border=True)
+m[2].metric("Organisations", f"{members.loc[members['Organisation'] != '', 'Organisation'].nunique():,}", border=True)
+m[3].metric("From lead organisations", f"{int(members['Organisation is a lead'].sum()):,}", border=True)
 
 with st.container(border=True):
     r1 = st.columns([2, 1.2, 1.2, 1.2])
-    search = r1[0].text_input("Search", placeholder="Name, email, institution, interest…", icon=":material/search:")
+    search = r1[0].text_input("Search", placeholder="Name, email, organisation, interest…", icon=":material/search:")
     levels = r1[1].multiselect("Level", sorted(x for x in members["Level"].unique() if x), placeholder="Any level")
     event_names = sorted({n.strip() for names in members["Event names"] for n in names.split(",") if n.strip()})
     events = r1[2].multiselect("Event", event_names, placeholder="Any event")
@@ -204,13 +204,13 @@ with st.container(border=True):
     t1, t2, t3, t4 = st.columns(4)
     mailable_only = t1.toggle("Mailable only")
     github_only = t2.toggle("Has GitHub")
-    lead_only = t3.toggle("From lead institutions")
+    lead_only = t3.toggle("From lead organisations")
     winners = t4.toggle("Winners")
 
 view = members
 if search:
     text = search.lower()
-    view = view[view[["Name", "Email", "Institution", "Interests", "Education"]].apply(
+    view = view[view[["Name", "Email", "Organisation", "Interests", "Education"]].apply(
         lambda r: text in " ".join(r).lower(), axis=1)]
 if levels:
     view = view[view["Level"].isin(levels)]
@@ -223,11 +223,11 @@ if mailable_only:
 if github_only:
     view = view[view["GitHub"] != ""]
 if lead_only:
-    view = view[view["Institution is a lead"]]
+    view = view[view["Organisation is a lead"]]
 if winners:
     view = view[view["Won"] > 0]
 
-columns = ["Name", "Level", "Institution", "State", "Interests", "Events", "Won", "GitHub", "LinkedIn", "Mailable"]
+columns = ["Name", "Level", "Organisation", "State", "Interests", "Events", "Won", "GitHub", "LinkedIn", "Mailable"]
 picked_event = st.dataframe(
     view[columns], hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",
     key="community_table", height=min(460, 35 * (len(view) + 1) + 3),

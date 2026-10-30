@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from functools import lru_cache
 from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -60,6 +61,7 @@ def clean(value: Any) -> str | None:
     return None if text.lower() in _EMPTY else text
 
 
+@lru_cache(maxsize=65536)  # imports compare the same few thousand names over and over
 def norm_key(text: str | None) -> str:
     """Comparison key: lower-case, '&' → 'and', punctuation dropped, spaces collapsed."""
     if not text:
@@ -153,7 +155,7 @@ _NAME_FILLER = {
 
 
 def names_look_alike(a: str | None, b: str | None) -> bool:
-    """True if two institution names plausibly mean the same place ('JNTU Hyderabad' vs 'JNTUH College…')."""
+    """True if two organisation names plausibly mean the same place ('JNTU Hyderabad' vs 'JNTUH College…')."""
     ka, kb = norm_key(a), norm_key(b)
     if not ka or not kb:
         return False
@@ -212,8 +214,9 @@ def match_area(text: str | None) -> str | None:
 
 
 def match_org_type(text: str | None) -> str | None:
-    """College / Standalone / University wording (including AISHE's longer labels)."""
-    key = norm_key(text)
+    """Type wording from a sheet: AISHE's College / Standalone / University labels, plus generic kinds of
+    organisation (company, startup, school, research institute, government body, non-profit)."""
+    key = norm_key(text).replace("-", " ")
     if not key:
         return None
     if "standalone" in key or "stand alone" in key:
@@ -222,9 +225,62 @@ def match_org_type(text: str | None) -> str | None:
         return "college"
     if "universit" in key or "deemed" in key or key in ("iit", "nit"):
         return "university"
+    if "school" in key or key in ("k12", "k 12"):
+        return "school"
+    if "startup" in key or "start up" in key:
+        return "startup"
+    if "research" in key or key in ("lab", "laboratory", "r&d centre", "r&d center"):
+        return "research_institute"
+    if "government" in key or key in ("govt", "psu", "ministry", "public sector", "state org", "state body"):
+        return "government"
+    if any(word in key for word in ("non profit", "nonprofit", "ngo", "foundation", "trust")):
+        return "non_profit"
+    if any(word in key for word in ("company", "corporate", "enterprise", "business", "pvt", "ltd", "llp",
+                                    "vendor")):
+        return "company"
+    if "partner" in key or "reseller" in key or "distributor" in key:
+        return "partner"
+    if "individual" in key or "person" in key:
+        return "individual"
     if "institute" in key:
         return "standalone"
     return None
+
+
+def guess_org_type(name: str | None) -> str:
+    """Best guess from an organisation's name alone (used when a form only asks for the name)."""
+    lower = (name or "").lower()
+    if "universit" in lower:
+        return "university"
+    if "college" in lower:
+        return "college"
+    if "school" in lower or "vidyalaya" in lower or "vidya mandir" in lower:
+        return "school"
+    if any(word in lower for word in ("research", "laboratory", "laboratories", "centre for", "center for",
+                                      "academy of sciences")):
+        return "research_institute"
+    if any(word in lower for word in ("foundation", "trust", "society", "ngo")):
+        return "non_profit"
+    if any(word in lower for word in ("pvt", "private limited", "ltd", "limited", "llp", "technologies",
+                                      "systems", "solutions", "labs", "inc")):
+        return "company"
+    return "other"
+
+
+# A starting industry for each kind of organisation; companies have no default because they could be in any.
+INDUSTRY_FOR_TYPE = {
+    "university": "Higher education",
+    "college": "Higher education",
+    "standalone": "Higher education",
+    "school": "School education",
+    "research_institute": "Research & development",
+    "government": "Government & public sector",
+    "non_profit": "Non-profit & CSR",
+}
+
+
+def default_industry(org_type: str | None) -> str | None:
+    return INDUSTRY_FOR_TYPE.get(org_type or "")
 
 
 # ---------- dates and numbers ----------

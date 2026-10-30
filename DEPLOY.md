@@ -1,7 +1,8 @@
 # Putting the demo online (Streamlit Community Cloud — free, public)
 
-The demo needs **no database account and no secrets**. On its first visit each day it builds its own SQLite
-database with fictional data (about 20 seconds), so there is nothing to keep awake and nothing to reset by hand.
+The demo needs **no database account and no secrets**. It builds its own SQLite database with fictional data and
+rebuilds it in the background once a day, so there is nothing to reset by hand. Only right after the app wakes up
+does a visitor wait (about 20–30 seconds, with a progress bar).
 
 ## 1. Push the repository to GitHub
 - Create a new repository, e.g. `quantum-bd-hub-demo` (public if you want visitors to see the code; the app can be
@@ -28,7 +29,8 @@ git push -u origin main
    DEMO_AUTHOR_URL = "https://your-portfolio.example"
    DEMO_REPO_URL = "https://github.com/YOUR-USERNAME/quantum-bd-hub-demo"
    ```
-5. **Deploy.** The first open shows *Preparing today's demo data…* for about 20 seconds; after that pages are instant.
+5. **Deploy.** The first open after a deploy or a wake-up shows *Preparing the demo data* with a progress bar
+   (about 20–30 seconds); after that pages are instant, and the daily refresh happens in the background.
 
 ## 3. Check it
 - Open the link in a private window → the welcome page → **Explore as Riya**.
@@ -44,5 +46,5 @@ git push -u origin main
 ## Everyday notes
 - Every `git push` to `main` redeploys within a minute or two.
 - The data resets daily and on every reboot (⋮ → Reboot app), so visitors' edits never pile up.
-- News & signals reads live public news feeds; the fictional institutions won't appear in real headlines, which is why
+- News & signals reads live public news feeds; the fictional organisations won't appear in real headlines, which is why
   the demo's signals are seeded by the story.

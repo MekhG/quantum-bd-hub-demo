@@ -42,7 +42,7 @@ _COMPARE = {"This week": "last week", "This month": "last month", "This quarter"
             "This FY": "last FY"}
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def _load(period_label: str):
     period = period_bounds(period_label)
     with session_scope() as session:
@@ -112,14 +112,14 @@ with m2, card("dash-hot"):
     if data["hot"].empty:
         st.caption("None yet. Save signals from News & signals to raise scores.")
     for row in data["hot"].to_dict("records"):
-        st.page_link("views/leads.py", label=f"{row['Institution']} · {row['Score']}",
+        st.page_link("views/leads.py", label=f"{row['Organisation']} · {row['Score']}",
                      query_params={"lead": int(row["lead_id"])}, icon=":material/local_fire_department:")
 with m3, card("dash-expiring"):
     st.markdown("**Quotes expiring in 7 days**")
     if data["expiring"].empty:
         st.caption("No sent quotation runs out this week.")
     for row in data["expiring"].to_dict("records"):
-        st.page_link("views/leads.py", label=f"{row['Institution']} · {row['Valid until']:%d %b}",
+        st.page_link("views/leads.py", label=f"{row['Organisation']} · {row['Valid until']:%d %b}",
                      query_params={"lead": int(row["lead_id"])}, icon=":material/timer:",
                      help=f"{row['Quote']} · {inr(row['Value'], decimals=False)} excl. GST")
 
@@ -204,7 +204,7 @@ with w2, card("demos"):
     for row in demos.head(6).to_dict("records"):
         when, lead = row["When"], row["lead_id"]
         label = f"**{when.day} {when:%b}, {when:%I:%M %p}**".replace(", 0", ", ") + \
-            f" · {row['Institution'] or row['What']}"
+            f" · {row['Organisation'] or row['What']}"
         st.page_link("views/leads.py", label=label, icon=":material/co_present:",
                      query_params={"lead": int(lead)} if lead is not None and lead == lead else None)
         st.caption(f"{row['What']} · {row['Who']}")
@@ -265,8 +265,8 @@ with o2, card("lost-reasons"):
                          format="%d", min_value=0, max_value=max(int(reasons["Leads"].max()), 1))})
     st.page_link("views/report.py", label="Weekly report", icon=":material/summarize:")
 
-with st.expander("Leads by track and recent imports", icon=":material/table_view:"):
-    a, b = st.columns(2, gap="large")
+with st.expander("Leads by track and by industry, recent imports", icon=":material/table_view:"):
+    a, c = st.columns(2, gap="large")
     a.dataframe(dash.tracks, hide_index=True, width="stretch",
                 column_config={
                     "Leads": st.column_config.ProgressColumn(format="%d", min_value=0,
@@ -274,6 +274,16 @@ with st.expander("Leads by track and recent imports", icon=":material/table_view
                     "Clients": st.column_config.NumberColumn(format="%d"),
                     "NQM": st.column_config.NumberColumn(format="%d", help="NQM applicants in this track"),
                 })
+    c.dataframe(dash.industries, hide_index=True, width="stretch",
+                column_config={
+                    "Industry": st.column_config.TextColumn(width="medium"),
+                    "Organisations": st.column_config.NumberColumn(format="%d"),
+                    "Leads": st.column_config.ProgressColumn(
+                        format="%d", min_value=0, max_value=max(int(dash.industries["Leads"].max()), 1)
+                        if not dash.industries.empty else 1),
+                    "Clients": st.column_config.NumberColumn(format="%d"),
+                })
+    b = st.container()
     recent = data["recent"]
     if recent.empty:
         b.caption("No imports yet.")

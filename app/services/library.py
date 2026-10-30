@@ -49,8 +49,10 @@ MERGE_FIELDS: dict[str, str] = {
     "name": "Full name as saved",
     "designation": "Designation",
     "department": "Department",
-    "institution": "Institution name",
-    "state": "Institution's state",
+    "organisation": "Organisation name",
+    "institution": "Organisation name (older scripts)",
+    "industry": "Organisation's industry",
+    "state": "Organisation's state",
     "product": "Lead's product fit (first product), or 'our quantum lab platforms'",
     "sender_name": "Lead owner's name",
     "sender_email": "The track's sender mailbox",
@@ -307,7 +309,7 @@ def attach_documents(session: Session, activity: Activity, document_ids: Iterabl
 
 
 def documents_for_org(session: Session, org_id: int) -> pd.DataFrame:
-    """What was shared with this institution, newest first (the lead record's Documents tab)."""
+    """What was shared with this organisation, newest first (the lead record's Documents tab)."""
     rows = session.execute(
         select(func.coalesce(Activity.occurred_at, Activity.scheduled_at), Document.title, Document.doc_type,
                Document.url, Document.version_no, Activity.title, User.name)
@@ -483,7 +485,8 @@ def merge_values(*, contact: Contact | None, org: Organisation | None, lead: Lea
         "salutation": salutation, "first_name": first, "last_name": last or first,
         "name": contact.name if contact else "", "designation": (contact.designation or "") if contact else "",
         "department": (contact.department or "") if contact else "",
-        "institution": org.name if org else "", "state": (org.state or "") if org else "",
+        "institution": org.name if org else "", "organisation": org.name if org else "",
+        "industry": (org.industry or "") if org else "", "state": (org.state or "") if org else "",
         "product": products[0] if products else "our quantum lab platforms",
         "sender_name": sender_name or "Team Demo", "sender_email": sender_email or "",
     }

@@ -10,7 +10,7 @@ from app.ui.layout import page_header
 user = require_user()
 page_header("Guide", "How the team uses the hub every day. Open the part for your role.", eyebrow="Help")
 
-st.info("This is a portfolio demo. Demo, its team, institutions, contacts and prices are all fictional; the data is "
+st.info("This is a portfolio demo. Demo, its team, organisations, contacts and prices are all fictional; the data is "
         "rebuilt every day, so feel free to click anything — log a call, move a stage, approve a post.",
         icon=":material/science:")
 
@@ -21,7 +21,7 @@ st.markdown(
     "with a note.\n"
     "2. Talked to someone outside a task — a call, WhatsApp, meeting? Use **New → Log activity** (top right). "
     "Add a next step so nothing is forgotten.\n"
-    "3. Anything to remember for later goes in **New → Task** — with or without an institution.\n"
+    "3. Anything to remember for later goes in **New → Task** — with or without an organisation.\n"
     "4. **Calendar** shows the same tasks on a week grid; **Add to my calendar (.ics)** puts meetings into "
     "Google Calendar or Outlook.\n"
     "5. Need a brochure, script or an answer to an objection? **Library**. Send only *Approved* versions, and pick them "
@@ -36,7 +36,7 @@ st.markdown(
 
 with st.expander("Neha — fresh lead generation and verification", icon=":material/person_search:"):
     st.markdown(
-        "- **Colleges** → filter (state, type, *Not a lead yet*) → **Download research batch**.\n"
+        "- **Organisations** → filter (industry, type, state, *Not a lead yet*) → **Download research batch**.\n"
         "- Research contacts with AI as usual, then **Import → Paste rows** (copy the AI's table including the "
         "header row). The paste box shows the exact column headers to ask the AI for.\n"
         "- **Contacts** → filter Track *Colleges — cold outreach* → tick the rows you've checked → "
@@ -61,14 +61,14 @@ with st.expander("Events, community and GTM charts — everyone", icon=":materia
         "**Import responses** → check the matched questions → **Import**. People are recognised by email, so the "
         "same person across events stays one member.\n"
         "- On the event, set **Status** (attended, finalist, winner), teams and project links, then mark the event "
-        "**Done**: each participant's institution that is a lead gets an *Event participation* signal (+10).\n"
-        "- **Community** finds people by level, interests, institution or event. **Mailing list** and **Copy "
+        "**Done**: each participant's organisation that is a lead gets an *Event participation* signal (+10).\n"
+        "- **Community** finds people by level, interests, organisation or event. **Mailing list** and **Copy "
         "emails** include only people who agreed to be contacted and are 18 or older. **Create lead** turns a "
-        "member's institution into a lead. Deletion requests: profile → More → Delete (admin).\n"
+        "member's organisation into a lead. Deletion requests: profile → More → Delete (admin).\n"
         "- **GTM charts → GTM map** is drawn from the cadences in Configuration, with live counts. **Diagram "
         "builder**: start from a template (partner model, reseller model, a track's cadence) or type arrows, e.g. "
-        "`Email -> Call -> Demo`; save and download as PNG, SVG or PDF. **Institute categories** compares public/"
-        "private and urban/rural institutions on leads, replies, demos, quotes and wins."
+        "`Email -> Call -> Demo`; save and download as PNG, SVG or PDF. **Compare segments** compares "
+        "industries, or public/private and urban/rural institutions, on leads, replies, demos, quotes and wins."
     )
 with st.expander("Content calendar — LinkedIn and Instagram", icon=":material/campaign:"):
     st.markdown(
@@ -87,7 +87,7 @@ with st.expander("Partners, clients and privacy requests", icon=":material/hands
     st.markdown(
         "- **Partners → New partner** for each reseller, distribution, referral, training or technology partner: model, "
         "NDA date, non-compete, price list version, payment terms, territory; link the signed NDA from the Library.\n"
-        "- When a partner tells us about an institution: **Register a deal** → pick partner and institution — the "
+        "- When a partner tells us about an organisation: **Register a deal** → pick partner and organisation — the "
         "hub shows at once if it's already our lead or another partner's. An admin **Approves** (the lead is linked "
         "to the partner, channel Reseller, locked for 60 days) or **Rejects** with a reason. After 5 won sales a "
         "reseller shows *Ready to upgrade*.\n"
@@ -119,7 +119,7 @@ with st.expander("Riya (admin) — calls, demos, queries, partners", icon=":mate
         "report** → check the numbers → add highlights, risks and support needed → **Finalise** (freezes the "
         "numbers) → **Word report** for leadership. Then **Targets** tab → adjust (it starts from last week's) → "
         "**Save targets**.\n"
-        "- **Signals in bulk:** News & signals → **Add signals** → paste the institutions named in a PIB release "
+        "- **Signals in bulk:** News & signals → **Add signals** → paste the organisations named in a PIB release "
         "(one per line) or upload a sheet → check the matches → save."
     )
 
@@ -127,7 +127,9 @@ st.markdown("#### What the words mean")
 st.markdown(
     "| Word | Meaning |\n|---|---|\n"
     "| **Track** | The kind of lead and its goal: colleges, referrals, research institutes, EdTech platforms, "
-    "schools, website enquiries, individual learners. |\n"
+    "schools, enterprises, website enquiries, individual learners. |\n"
+    "| **Industry** | The sector an organisation works in (Higher education, Telecom, Banking & finance…). "
+    "Filters Organisations, Contacts and Leads; the list is in Configuration. |\n"
     "| **Stage** | How far the conversation has got: New → First Contact Made → Replied to Queries → Sent Brochure "
     "→ demos → Sent Quotation → Deal PO Released; or Ghosted / Rejected. |\n"
     "| **Cadence** | The follow-up routine for a track; the hub plans each step and stops when they reply. |\n"
@@ -137,13 +139,13 @@ st.markdown(
     "| **Do not contact** | They asked not to be contacted; no import or cadence will reach them again. |\n"
     "| **Signal** | A dated fact that makes a sale more likely — NQM lab approved, tender, new centre, grant, FDP. "
     "Worth points that fade to zero over 12 months. |\n"
-    "| **Lead score** | The institution's signals plus automatic points (open quote, recent reply, demo, NQM flag). "
+    "| **Lead score** | The organisation's signals plus automatic points (open quote, recent reply, demo, NQM flag). "
     "**Hot** = at or above the hot score (40). |\n"
-    "| **Outreach** | Institutions contacted for the first time that week. |\n"
+    "| **Outreach** | Organisations contacted for the first time that week. |\n"
     "| **Follow-up** | Any later touch — calls, emails, WhatsApp, LinkedIn, meetings. |\n"
     "| **Community member** | Someone who took part in one of our events; recognised by email. |\n"
     "| **Mailable** | A community member who agreed to be contacted and confirmed they're 18 or older. |\n"
-    "| **Deal registration** | A partner's claim on an institution; once approved, no one else works it for 60 "
+    "| **Deal registration** | A partner's claim on an organisation; once approved, no one else works it for 60 "
     "days. |\n"
     "| **AMC** | Annual maintenance contract — support after the warranty, priced as a % of the equipment value. |\n"
     "| **Engagements** | Likes + comments + reposts on a post. |\n"
@@ -156,7 +158,7 @@ st.markdown(
     "- **Keyboard:** Tab moves between controls, Enter presses a button, Esc closes a pop-up.\n"
     "- **Bigger text:** use your browser's zoom (Ctrl + / Ctrl −); the layout adapts.\n"
     "- **Dark mode:** ⋮ (top right) → Settings → Theme.\n"
-    "- **Search:** the box at the top of every page finds leads, contacts and colleges by name, email, phone or "
+    "- **Search:** the box at the top of every page finds leads, contacts and organisations by name, email, phone or "
     "AISHE code.\n"
     "- **Alerts (bell):** tasks handed to you, queries past the 1-day reply target, finished cadences.\n"
     "- **On a phone:** the menu opens from » at the top; search, alerts, **New** and your name stay at the top.\n"

@@ -22,14 +22,16 @@ class Field:
 
 # ---- shared building blocks ----
 
-_INSTITUTION = Field("institution", "Institution Name",
-                     ("institution name", "institution", "institute name", "college name", "organisation",
-                      "organization", "academia", "university", "institution university",
-                      "institution organisation", "institution organization"), required=True)
+_INSTITUTION = Field("institution", "Organisation Name",
+                     ("organisation name", "organization name", "institution name", "institution", "institute name",
+                      "college name", "organisation", "organization", "company name", "company", "account name",
+                      "account", "academia", "university", "institution university", "institution organisation",
+                      "institution organization"), required=True)
+_INDUSTRY = Field("industry", "Industry", ("industry", "sector", "industry sector", "vertical", "industry type"))
 _CONTACT_NAME = Field("contact_name", "Contact Name",
                       ("contact name", "contact person", "name of contact", "contact", "recipient name", "poc",
                        "poc name", "faculty name", "professor hod", "hod prof", "hod professor",
-                       # A bare 'Name' next to an 'Institution Name' column is the person.
+                       # A bare 'Name' next to an 'Organisation Name' column is the person.
                        "name", "full name"))
 _EMAIL = Field("email", "Email Id",
                ("email id", "email", "email address", "e-mail", "e mail", "mail id", "mail"))
@@ -52,7 +54,8 @@ _WEBSITE = Field("website", "Website", ("website", "web site", "url", "website l
 _LOCATION = Field("location", "Location", ("location", "place", "area"))
 _DISTRICT = Field("district", "District", ("district", "city"))
 _STATE = Field("state", "State", ("state", "state name"))
-_ORG_TYPE = Field("org_type", "Type", ("type", "institution type", "type of institution"))
+_ORG_TYPE = Field("org_type", "Type", ("type", "institution type", "type of institution", "organisation type",
+                                       "organization type", "org type", "company type"))
 _NOTES = Field("notes", "Notes", ("notes", "note", "remarks", "comments", "comment"))
 _PRODUCT_FIT = Field("product_fit", "Product Fit",
                      ("product fit", "products of interest", "product interest", "products enquired for",
@@ -68,6 +71,7 @@ TRACKER_FIELDS: tuple[Field, ...] = (
     _LOCATION,
     _ORG_TYPE,
     _INSTITUTION,
+    _INDUSTRY,
     _CONTACT_NAME,
     _EMAIL,
     _PHONE,
@@ -94,6 +98,7 @@ TRACKER_FIELDS: tuple[Field, ...] = (
 
 RESPONSES_FIELDS: tuple[Field, ...] = (
     _INSTITUTION,
+    _INDUSTRY,
     _CONTACT_NAME,
     _EMAIL,
     _PHONE,
@@ -117,6 +122,7 @@ RESPONSES_FIELDS: tuple[Field, ...] = (
 
 CLIENTS_FIELDS: tuple[Field, ...] = (
     _INSTITUTION,
+    _INDUSTRY,
     _CONTACT_NAME,
     _EMAIL,
     _CONTACT_TYPE,
@@ -137,7 +143,9 @@ CLIENTS_FIELDS: tuple[Field, ...] = (
 COLLEGES_FIELDS: tuple[Field, ...] = (
     _ORG_TYPE,
     _AISHE,
-    Field("institution", "Name", ("name", "institution name", "college name", "institute name"), required=True),
+    Field("institution", "Name", ("name", "institution name", "college name", "institute name", "organisation name",
+                                  "organization name", "company name", "company", "organisation"), required=True),
+    _INDUSTRY,
     _WEBSITE,
     _STATE,
     _DISTRICT,
@@ -160,9 +168,9 @@ MINI_FIELDS: tuple[Field, ...] = (
     _POTENTIAL,
     Field("about", "About", ("about", "about them", "background", "profile")),
     _NOTES,
-    Field("institution", "Institution / Organisation",
+    Field("institution", "Organisation",
           ("institution organisation", "institution organization", "institution", "organisation",
-           "organization", "company", "college", "university", "institution name")),
+           "organization", "company", "college", "university", "institution name", "organisation name")),
     _OWNER,
     _CHANNEL,
     _STATE,

@@ -140,6 +140,7 @@ def lost_reasons_frame(session: Session) -> pd.DataFrame:
 
 
 LIST_LABELS = {
+    "industry": "Industry",
     "tier": "Tier",
     "potential": "Potential",
     "contact_type": "Contact type",

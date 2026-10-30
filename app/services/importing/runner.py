@@ -44,6 +44,8 @@ from app.services.importing.normalise import (
     domain_from_email,
     domain_from_website,
     match_area,
+    default_industry,
+    guess_org_type,
     match_org_type,
     match_state,
     norm_key,
@@ -63,12 +65,12 @@ KIND_LABELS = {
     "responses": "Responses",
     "clients": "Clients",
     "mini": "Mini products",
-    "colleges": "Raw college list",
+    "colleges": "Organisation list",
 }
 
 # How the contacts in a sheet were collected → DPDP basis recorded in the consent log.
 COLLECTION_METHODS: dict[str, str] = {
-    "Institution website / public directory": "publicly_available",
+    "Organisation website / public directory": "publicly_available",
     "They contacted us (enquiry / reply)": "consent",
     "Event or meeting (shared their details)": "consent",
     "Existing customer (gave details for the purchase)": "legitimate_use",
@@ -83,6 +85,7 @@ DEFAULT_LEAD_SOURCE = {
     "research_labs": "Research institutes",
     "edtech": "EdTech platforms",
     "schools": "Schools",
+    "enterprise": "Enterprise prospect list",
     "individuals": "Mini products",
 }
 
@@ -95,7 +98,7 @@ class ImportOptions:
     kind: str
     track_id: int | None = None
     lead_source: str | None = None
-    collection_method: str = "Institution website / public directory"
+    collection_method: str = "Organisation website / public directory"
     already_verified: bool = False
     create_delivery_tasks: bool = True
     fill_down: bool = False  # institution name only on the first row of each group
@@ -144,7 +147,7 @@ class DuplicateRow(Exception):
 
 
 class StateHeading(Exception):
-    """A row that only names a state (e.g. 'ANDHRA PRADESH') above a group of institutions."""
+    """A row that only names a state (e.g. 'ANDHRA PRADESH') above a group of organisations."""
 
 
 def _append_unique(existing: str | None, items: list[str], sep: str = "; ") -> str | None:
@@ -213,7 +216,8 @@ class _Importer:
             "Potential": "left blank",
             "Tier": "left blank",
             "Channel": "left as Direct",
-            "Institution type": "saved as College",
+            "Organisation type": "guessed from the name",
+            "Industry": "left blank",
             "Owner": "not a team member in the app, so recorded as the lead's source",
             "Response source": "treated as Other",
         }
@@ -261,7 +265,7 @@ class _Importer:
     # ---------- institutions ----------
 
     def apply_fill_down(self, v: dict[str, str | None]) -> None:
-        """Handles state heading rows always, and copies the institution down when fill-down is on."""
+        """Handles state heading rows always, and copies the organisation down when fill-down is on."""
         name = v.get("institution")
         has_person = bool(v.get("email") or v.get("contact_name") or v.get("phone"))
         if name and not has_person and match_state(name) and not v.get("aishe"):
@@ -282,7 +286,7 @@ class _Importer:
     def resolve_org(self, values: dict[str, str | None], *, create: bool = True) -> tuple[Organisation, str]:
         name = values.get("institution")
         if not name:
-            raise RowSkipped("Institution name is empty.")
+            raise RowSkipped("Organisation name is empty.")
         location = values.get("location")
         area = match_area(location)
         city, state_from_location = (None, None) if area else parse_location(location)
@@ -296,7 +300,7 @@ class _Importer:
         match = self.lk.orgs.find(aishe=aishe, domains=domains, name=name, state=state)
         if match.ambiguous:
             raise RowSkipped(
-                f"'{name}' matches more than one institution in the database. Add a State or AISHE code column."
+                f"'{name}' matches more than one organisation in the database. Add a State or AISHE code column."
             )
 
         # AISHE prefix (C-/S-/U-) is authoritative; otherwise use the Type column.
@@ -307,7 +311,7 @@ class _Importer:
             if self.o.kind == "colleges":
                 list_tags.append(type_text)  # e.g. 'Vidyalaxmi': which list it came from, not a type
             elif not org_type:
-                self.unlisted["Institution type"][type_text] += 1
+                self.unlisted["Organisation type"][type_text] += 1
 
         management, category = values.get("management"), values.get("category")
         if management and "universit" in management.lower():
@@ -316,16 +320,18 @@ class _Importer:
                 category = management
             management = None
         tier = self._option("tier", values.get("tier"), "Tier")
+        industry = self._option("industry", values.get("industry"), "Industry")
 
         if match.org is not None:
             org = match.org
             if id(org) not in self._seen_orgs and org not in self.created["organisations"]:
-                self.count("Institutions matched")
+                self.count("Organisations matched")
             self._seen_orgs.add(id(org))
             for attr, value in (
                 ("aishe_code", aishe), ("website", website), ("domain", domain_from_website(website) or email_domain),
                 ("state", state), ("city", city), ("area", area), ("affiliated_university", values.get("university")),
                 ("management", management), ("category", category),
+                ("industry", industry or default_industry(org_type or org.org_type)),
             ):
                 self._fill(org, attr, value)
             if tier and org.tier and org.tier != tier:
@@ -337,14 +343,18 @@ class _Importer:
             return org, f"matched by {match.how}"
 
         if not create:
-            raise RowSkipped(f"Institution '{name}' not found. Import it via the tracker first, or check the name.")
+            raise RowSkipped(f"Organisation '{name}' not found. Import it via the tracker first, or check the name.")
         if not org_type:
+            if self.o.kind == "colleges" and (aishe or industry in (None, "Higher education")):
+                org_type = "college"  # an AISHE-style list: rows are higher-education institutions
+            else:
+                org_type = guess_org_type(name)
             if not type_text:
-                self.count("New institutions without a Type (saved as College)")
-            org_type = "college"
+                self.count("New organisations without a Type (guessed from the name)")
         org = Organisation(
             name=name[:255],
             org_type=org_type,
+            industry=industry or default_industry(org_type),
             aishe_code=aishe,
             website=website,
             domain=domain_from_website(website) or email_domain,
@@ -360,7 +370,7 @@ class _Importer:
         self.s.add(org)
         self.lk.orgs.add(org)
         self.created["organisations"].append(org)
-        self.count("Institutions created")
+        self.count("Organisations created")
         return org, "new"
 
     def individual_org(self, name: str, state: str | None) -> Organisation:
@@ -613,7 +623,7 @@ class _Importer:
             bucket["potentials"].append(potential)
         self.apply_product_fit(lead, v.get("product_fit"), v.get("product_fit2"))
         self.lead_notes(lead, v)
-        return f"Institution {how}; " + ("contact added" if contact else "no contact on this row")
+        return f"Organisation {how}; " + ("contact added" if contact else "no contact on this row")
 
     def finish_stages(self, agg: dict[int, dict[str, Any]]) -> None:
         for bucket in agg.values():
@@ -675,7 +685,7 @@ class _Importer:
                                 notes=text, owner=owner, seen=seen):
             return "Already logged earlier — skipped"
         self.count("Responses logged")
-        return f"Institution {how}; response logged on {when:%d %b %Y}"
+        return f"Organisation {how}; response logged on {when:%d %b %Y}"
 
     def _lead_for_response(self, org: Organisation, source: str, owner: User | None) -> Lead:
         leads = self.lk.leads_by_org.get(id(org), [])
@@ -714,7 +724,7 @@ class _Importer:
 
         if po_date is None and not products:
             self.count("Clients recorded without PO details")
-            return f"Institution {how}; recorded as a client (no PO date or products yet)"
+            return f"Organisation {how}; recorded as a client (no PO date or products yet)"
 
         key = (id(lead), po_date)
         deal = deals.get(key)
@@ -762,7 +772,7 @@ class _Importer:
                 self.count("Delivery follow-ups scheduled")
             elif due < self.today:
                 self.count("Deliveries already past due date (not scheduled)")
-        return f"Institution {how}; " + (f"products: {', '.join(added)}" if added else "no new products")
+        return f"Organisation {how}; " + (f"products: {', '.join(added)}" if added else "no new products")
 
     def mini_row(self, v: dict[str, str | None], agg: dict[int, dict[str, Any]], seen: set[tuple]) -> str:
         if self.track is None:
@@ -820,7 +830,7 @@ class _Importer:
         if aishe:
             seen_aishe.add(aishe)
         _, how = self.resolve_org(v)
-        return "New institution" if how == "new" else f"Institution {how}"
+        return "New organisation" if how == "new" else f"Organisation {how}"
 
 
 def _row_values(row: pd.Series, mapping: ColumnMapping) -> dict[str, str | None]:
@@ -888,7 +898,7 @@ def run_import(session: Session, frame: pd.DataFrame, options: ImportOptions, us
                 outcome, status = str(skipped), "skipped"
             report.outcomes.append({
                 "Row": str(importer.row),
-                "Institution": values.get("institution") or "",
+                "Organisation": values.get("institution") or "",
                 "Contact": values.get("contact_name") or values.get("_email") or "",
                 "Result": status,
                 "Details": outcome,

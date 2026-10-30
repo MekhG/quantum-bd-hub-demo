@@ -34,8 +34,8 @@ PERSONAS: tuple[Persona, ...] = (
             "Email automation and warm-lead verification; drafts LinkedIn posts.",
             "Download today's email batch, mark it sent, and watch each cadence move on.", ":material/outgoing_mail:"),
     Persona("neha@demo.example", "Neha Iyer", "Member",
-            "Lead generation: researches colleges, imports research batches, verifies contacts.",
-            "Filter the Colleges pool, download a research batch, and paste rows back on Import.",
+            "Lead generation: researches colleges and companies, imports research batches, verifies contacts.",
+            "On Organisations, pick an industry, download a research batch, and paste rows back on Import.",
             ":material/person_search:"),
     Persona("leadership@demo.example", "Leadership", "Viewer",
             "Read-only: the dashboard, pipeline and the weekly leadership report.",
@@ -82,10 +82,11 @@ def welcome_page() -> None:
         html_block(
             '<div class="qa-hero"><div class="qa-hero-text"><div class="qa-hero-crumb">Live demo · portfolio project'
             '</div><h1 class="qa-hero-title">BD &amp; Marketing Hub</h1><p class="qa-hero-sub">One app for a small '
-            'business-development team selling quantum teaching labs to universities: leads and contacts, follow-up '
+            'business-development team selling quantum teaching labs to universities and upskilling to companies: '
+            'organisations filtered by industry, leads and contacts, follow-up '
             'cadences, every call, email, WhatsApp and meeting on one timeline, a knowledge base, quotations, partners, '
             'events, a content calendar, news signals and a weekly leadership report.</p></div></div>')
-        st.caption("**Demo** is a fictional company. Every institution, person, price and number here is made up, and "
+        st.caption("**Demo** is a fictional company. Every organisation, person, price and number here is made up, and "
                    "the data is rebuilt every day — so click anything.")
         st.markdown("#### Explore as")
         columns = st.columns(2)

@@ -60,7 +60,7 @@ def _flash(message: str, kind: str = "success", details: list[str] | None = None
     st.rerun()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> dict:
     with session_scope() as session:
         return {
@@ -74,19 +74,19 @@ def _choices() -> dict:
         }
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _documents(text: str, include_old: bool) -> pd.DataFrame:
     with session_scope() as session:
         return documents_frame(session, text=text or None, include_old=include_old)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _scripts(text: str, include_old: bool) -> pd.DataFrame:
     with session_scope() as session:
         return scripts_frame(session, text=text or None, include_old=include_old)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _objections(text: str, product_id: int | None, track_id: int | None) -> pd.DataFrame:
     with session_scope() as session:
         return objections_frame(session, text=text or None, product_id=product_id, track_id=track_id)
@@ -307,7 +307,7 @@ def _script_form(prefix: str, current: Script | None = None) -> ScriptData:
                        else 0, key=f"{prefix}_step_{track}", disabled=not steps,
                        help="Tie an email script to a cadence step and the email batch fills it in for every row.")
     subject = st.text_input("Subject", value=(current.subject or "") if current else "", key=f"{prefix}_subject",
-                            disabled=kind != "email", placeholder="e.g. Quantum lab for {institution}")
+                            disabled=kind != "email", placeholder="e.g. Quantum lab for {organisation}")
     body = st.text_area("Text", value=current.body if current else "", height=220, key=f"{prefix}_body",
                         placeholder="Dear {salutation} {last_name},\n\n…\n\nRegards,\n{sender_name}")
     notes = st.text_input("Notes for the team (optional)", value=(current.notes or "") if current else "",
@@ -355,11 +355,11 @@ def edit_script_dialog(script_id: int, as_new_version: bool) -> None:
 
 def _preview(script: dict, key: str) -> None:
     """Fill the script for a real lead's main contact."""
-    search = st.text_input("Preview for an institution", placeholder="Type 3+ letters", key=f"{key}_q",
+    search = st.text_input("Preview for an organisation", placeholder="Type 3+ letters", key=f"{key}_q",
                            icon=":material/search:")
     with session_scope() as session:
         matches = institution_choices(session, search)
-    org_id = st.selectbox("Institution", [m[0] for m in matches], format_func=dict(matches).get,
+    org_id = st.selectbox("Organisation", [m[0] for m in matches], format_func=dict(matches).get,
                           index=0 if len(matches) == 1 else None, placeholder="Choose", disabled=not matches,
                           key=f"{key}_org_{search.strip().lower()}", label_visibility="collapsed")
     if org_id is None:
@@ -446,7 +446,7 @@ def scripts_tab() -> None:
     if found.empty:
         with card("no-scripts"):
             st.markdown("**No scripts yet.**")
-            st.caption("Add your email and call scripts. Use fill-in fields like {first_name} and {institution}.")
+            st.caption("Add your email and call scripts. Use fill-in fields like {first_name} and {organisation}.")
         return
     event = st.dataframe(found[["Title", "Kind", "Track", "Cadence step", "Status", "Version", "Subject"]],
                          hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",

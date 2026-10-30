@@ -12,11 +12,11 @@ from app.ui.common import require_user
 from app.ui.layout import empty_state, page_header
 
 require_user()
-page_header("History", "Every edit, addition and deletion made in the Leads, Colleges and Contacts tables. "
+page_header("History", "Every edit, addition and deletion made in the Leads, Organisations and Contacts tables. "
             "Imports are listed on the Import page.", eyebrow="Data")
 
 
-@st.cache_data(ttl=30, show_spinner="Loading history…")
+@st.cache_data(ttl=3600, show_spinner="Loading history…")
 def load_history():
     with session_scope() as session:
         return audit_frame(session, limit=3000)

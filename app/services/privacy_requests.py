@@ -109,7 +109,7 @@ def log_request(session: Session, *, request_type: str, requester_name: str | No
 
 
 def find_records(session: Session, email: str) -> dict:
-    """Where the person appears: contacts (with institution), community, activities, consent and suppression."""
+    """Where the person appears: contacts (with organisation), community, activities, consent and suppression."""
     email = normalise_email(email)
     contacts = _contacts(session, email)
     members = _members(session, email)
@@ -123,9 +123,9 @@ def find_records(session: Session, email: str) -> dict:
         Organisation.id.in_([c.org_id for c in contacts if c.org_id]))).all()) if contacts else {}
     return {
         "email": email,
-        "contacts": [{"id": c.id, "Name": c.name, "Institution": orgs.get(c.org_id, ""),
+        "contacts": [{"id": c.id, "Name": c.name, "Organisation": orgs.get(c.org_id, ""),
                       "Designation": c.designation or "", "Do not contact": c.do_not_contact} for c in contacts],
-        "members": [{"id": m.id, "Name": m.name, "Institution": m.institution or "", "Level": m.level or "",
+        "members": [{"id": m.id, "Name": m.name, "Organisation": m.institution or "", "Level": m.level or "",
                      "Consent": m.consent, "Do not contact": m.do_not_contact} for m in members],
         "activities": int(activities or 0),
         "participations": int(participations or 0),
@@ -145,7 +145,7 @@ def export_person(session: Session, email: str, user: User) -> bytes:
     members = _members(session, email)
     orgs = dict(session.execute(select(Organisation.id, Organisation.name)).all())
     contact_rows = [{
-        "Name": c.name, "Institution": orgs.get(c.org_id, ""), "Designation": c.designation, "Type": c.contact_type,
+        "Name": c.name, "Organisation": orgs.get(c.org_id, ""), "Designation": c.designation, "Type": c.contact_type,
         "Department": c.department, "Research interests": c.research_interests, "Email": c.email, "Phone": c.phone,
         "LinkedIn": c.linkedin_url, "Source": c.source, "Do not contact": c.do_not_contact,
         "Added": c.created_at.date() if c.created_at else None} for c in contacts]
@@ -160,7 +160,7 @@ def export_person(session: Session, email: str, user: User) -> bytes:
             .where(ActivityParticipant.contact_id.in_([c.id for c in contacts])).distinct())] if contacts else []
     member_rows = [{
         "Name": m.name, "Email": m.email, "Phone": m.phone, "Education": m.education, "Level": m.level,
-        "Institution": m.institution, "City": m.city, "State": m.state, "Interests": m.interests,
+        "Organisation": m.institution, "City": m.city, "State": m.state, "Interests": m.interests,
         "GitHub": m.github_url, "Website": m.website_url, "LinkedIn": m.linkedin_url, "Projects": m.project_links,
         "Consent to updates": m.consent, "Consent on": m.consent_on, "Source": m.source,
         "Do not contact": m.do_not_contact} for m in members]
@@ -217,7 +217,7 @@ def withdraw_consent(session: Session, email: str, user: User) -> str:
 
 def delete_everywhere(session: Session, email: str, user: User) -> str:
     """Admin only: removes their contact and community records (activities lose them as a participant; the log of
-    the activity itself stays for the institution). A one-way hash keeps them from being imported again."""
+    the activity itself stays for the organisation). A one-way hash keeps them from being imported again."""
     _require(user, "admin")
     email = normalise_email(email)
     contacts = _contacts(session, email)

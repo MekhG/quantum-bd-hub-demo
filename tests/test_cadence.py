@@ -164,7 +164,7 @@ def test_moving_the_stage_by_hand_stops_the_cadence(seeded: Session) -> None:
     original = leads_frame(seeded).set_index("lead_id")
     edited = original.copy()
     edited.at[lead.id, "Stage"] = "Sent Brochure"
-    apply_plan(seeded, plan_edits(LEADS, original, edited, "Institution"), original["_version"].to_dict(), riya)
+    apply_plan(seeded, plan_edits(LEADS, original, edited, "Organisation"), original["_version"].to_dict(), riya)
     seeded.commit()
     seeded.refresh(lead)
     assert lead.cadence_status == "stopped" and not _planned(seeded, lead)

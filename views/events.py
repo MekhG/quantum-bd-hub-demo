@@ -46,7 +46,7 @@ def _done(message: str, kind: str = "success", details: list[str] | None = None)
     st.rerun()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> tuple[list[str], list[tuple[int, str]]]:
     with session_scope() as session:
         kinds = list(session.scalars(select(OptionList.value).where(OptionList.list_name == "event_kind",
@@ -56,13 +56,13 @@ def _choices() -> tuple[list[str], list[tuple[int, str]]]:
         return kinds, team
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _events() -> pd.DataFrame:
     with session_scope() as session:
         return events_frame(session)
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _participants(event_id: int) -> pd.DataFrame:
     with session_scope() as session:
         return participants_frame(session, event_id)
@@ -93,7 +93,7 @@ def event_dialog(event_id: int | None = None) -> None:
     status = d.selectbox("Status", EVENT_STATUSES, format_func=str.title,
                          index=EVENT_STATUSES.index(c["status"]) if c.get("status") in EVENT_STATUSES else 0,
                          help="Marking an event Done adds an 'Event participation' signal to each participant's "
-                              "institution that is a lead.")
+                              "organisation that is a lead.")
     a, b = st.columns(2)
     venue = a.text_input("Venue or platform", value=c.get("venue") or "", placeholder="e.g. Online (Zoom) / Omega "
                                                                                        "University, Kochi")
@@ -193,7 +193,7 @@ def add_person_tab(event_id: int) -> None:
         name = a.text_input("Name")
         email = b.text_input("Email")
         a, b, c = st.columns(3)
-        institution = a.text_input("Institution")
+        institution = a.text_input("Organisation")
         education = b.text_input("Education / profession", placeholder="e.g. M.Sc Physics")
         role = c.selectbox("Role", PARTICIPANT_ROLES, format_func=ROLE_LABELS.get)
         team = st.text_input("Team name (optional)")
@@ -259,7 +259,7 @@ def event_page(event_id: int) -> None:
     m[1].metric("Teams", parts.loc[parts["Team"] != "", "Team"].nunique() if not parts.empty else 0, border=True)
     m[2].metric("Attended", int(parts["Status"].isin(["Attended", "Finalist", "Winner"]).sum()) if not parts.empty
                 else 0, border=True)
-    m[3].metric("Institutions", parts.loc[parts["Institution"] != "", "Institution"].nunique() if not parts.empty
+    m[3].metric("Organisations", parts.loc[parts["Organisation"] != "", "Organisation"].nunique() if not parts.empty
                 else 0, border=True)
     m[4].metric("Mailable", int(parts["Mailable"].sum()) if not parts.empty else 0, border=True,
                 help="Consent + 18 or older + not on the do-not-contact list.")
@@ -272,9 +272,9 @@ def event_page(event_id: int) -> None:
         else:
             edited = st.data_editor(
                 parts, hide_index=True, width="stretch", key=f"parts_{event_id}", placeholder="",
-                disabled=not user.can("member") or ["id", "member_id", "Name", "Email", "Institution", "Level",
+                disabled=not user.can("member") or ["id", "member_id", "Name", "Email", "Organisation", "Level",
                                                      "GitHub", "Mailable"],
-                column_order=["Name", "Institution", "Level", "Team", "Role", "Status", "Project", "Project link",
+                column_order=["Name", "Organisation", "Level", "Team", "Role", "Status", "Project", "Project link",
                               "GitHub", "Mailable", "Email"],
                 height=min(520, 35 * (len(parts) + 1) + 3),
                 column_config={

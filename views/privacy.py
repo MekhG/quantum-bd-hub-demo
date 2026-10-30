@@ -45,7 +45,7 @@ def _me(session) -> User:
     return session.get(User, user.id)
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _requests() -> pd.DataFrame:
     with session_scope() as session:
         return requests_frame(session)
@@ -136,7 +136,7 @@ def request_panel(row: dict) -> None:
             if user.can("admin"):
                 with st.popover("Delete everywhere", icon=":material/delete_forever:"):
                     st.caption("Removes their contact and community records for good. Activities with the "
-                               "institution stay, without them. Only a one-way hash of the email is kept so a later "
+                               "organisation stay, without them. Only a one-way hash of the email is kept so a later "
                                "import can't add them back. **This can't be undone.**")
                     sure = st.checkbox("I've checked these are the right records", key=f"pr_sure_{rid}")
                     if st.button("Delete", type="primary", disabled=not sure, key=f"pr_delete_{rid}"):

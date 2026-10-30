@@ -1,4 +1,4 @@
-"""The lead record page: one institution in one track — header, stage bar, activity feed and the side panel.
+"""The lead record page: one organisation in one track — header, stage bar, activity feed and the side panel.
 
 Opened from anywhere with /leads?lead=<id> (Today, search, alerts, Queries, Calendar, or 'Open lead record').
 """
@@ -25,7 +25,7 @@ from app.services.activity_log import (
 )
 from app.services.cadence import IST, STATUS_LABELS, start_cadence, stop_cadence
 from app.services.editing import EditError, set_main_contact
-from app.services.lead_queries import audit_frame, lead_detail
+from app.services.lead_queries import ORG_TYPE_LABELS, audit_frame, lead_detail
 from app.services.library import documents_for_org
 from app.services.procurement import deals_for_lead
 from app.services.signals import SignalError, add_signal, hot_score, manual_types, recompute_scores, score_parts
@@ -108,7 +108,8 @@ def _load(lead_id: int) -> dict | None:
             "signal_types": [(t.id, t.name) for t in manual_types(session)],
             "my_signals": [(sig.id, f"{name} · {sig.observed_on:%d %b %Y}", sig.created_by_user_id)
                            for sig, name, _ in signals],
-            "lead_id": lead_id, "org_id": org.id, "name": org.name, "type": (org.org_type or "").replace("_", " "),
+            "lead_id": lead_id, "org_id": org.id, "name": org.name, "type": ORG_TYPE_LABELS.get(org.org_type, ""),
+            "industry": org.industry or "",
             "where": ", ".join(x for x in (org.city, org.state) if x), "aishe": org.aishe_code,
             "website": org.website, "university": org.affiliated_university, "management": org.management,
             "category": org.category, "area": org.area, "tier": org.tier,
@@ -128,7 +129,7 @@ def _load(lead_id: int) -> dict | None:
             "contacts": detail["contacts"], "deals": deals_for_lead(session, lead_id), "product_fit": detail["product_fit"],
             "other_tracks": detail["other_tracks"], "timeline": timeline, "documents": documents,
             "changes": changes[((changes["What"] == "Lead") & (changes["ID"] == str(lead_id)))
-                               | ((changes["What"] == "Institution") & (changes["ID"] == str(org.id)))],
+                               | ((changes["What"] == "Organisation") & (changes["ID"] == str(org.id)))],
         }
 
 
@@ -136,7 +137,7 @@ def _header(r: dict, user: CurrentUser) -> None:
     can = user.can("member")
     with card("record-head"):
         info, actions = st.columns([3, 2.2], vertical_alignment="top")
-        tags: list = [r["type"].title() if r["type"] else "", r["where"], r["tier"] or ""]
+        tags: list = [(r["industry"], "purple") if r["industry"] else "", r["type"], r["where"], r["tier"] or ""]
         if r["nqm"]:
             tags.append(("NQM applicant", "yellow"))
         tags.append((r["track"], "blue"))
@@ -385,7 +386,7 @@ def _signals(r: dict, user: CurrentUser) -> None:
                    f'<b>Signals</b>{chip(label, "yellow" if hot else "neutral", strong=True)}</div>')
         counting = [p for p in r["parts"] if p.points > 0]
         if not counting:
-            st.caption("No signals yet. Add one when you see news about this institution — an NQM lab, a tender, a "
+            st.caption("No signals yet. Add one when you see news about this organisation — an NQM lab, a tender, a "
                        "new centre — or save it from News & signals.")
         rows = []
         for part in counting:
@@ -418,7 +419,7 @@ def _signals(r: dict, user: CurrentUser) -> None:
                     except (SignalError, PermissionError) as error:
                         st.error(str(error))
                     else:
-                        _flash("success", "Signal saved; the score is updated for every lead of this institution.")
+                        _flash("success", "Signal saved; the score is updated for every lead of this organisation.")
             removable = [(sid, label) for sid, label, by in r["my_signals"] if user.can("admin") or by == user.id]
             if removable:
                 with st.popover("Remove", type="tertiary", disabled=not can):
@@ -433,7 +434,7 @@ def _signals(r: dict, user: CurrentUser) -> None:
                         else:
                             _flash("success", f"Removed: {label}.")
             with st.popover("Names in news", type="tertiary", disabled=not can):
-                st.caption("Other names the news uses for this institution, separated by commas — e.g. "
+                st.caption("Other names the news uses for this organisation, separated by commas — e.g. "
                            "“IIT Bombay, IITB”. Used to spot it in headlines.")
                 text = st.text_input("Also known as", value=r["aliases"], key="sig_aliases")
                 if st.button("Save names", type="primary", key="sig_aliases_go"):
@@ -451,6 +452,7 @@ def _details(r: dict) -> None:
         website = (f'<a href="{esc(r["website"])}" target="_blank" rel="noopener" style="color:inherit">'
                    f'{esc(r["website"].replace("https://", "").replace("http://", ""))}</a>') if r["website"] else ""
         html_block(facts([
+            ("Industry", esc(r["industry"])),
             ("AISHE code", f'<span class="qa-mono">{esc(r["aishe"])}</span>' if r["aishe"] else ""),
             ("Management", esc(r["management"] or "")),
             ("Owner", esc(r["owner"])),

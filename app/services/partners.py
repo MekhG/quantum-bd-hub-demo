@@ -1,7 +1,7 @@
 """Partners and deal registration.
 
-A partner (reseller, distribution partner…) registers a deal for an institution. The hub checks for overlap — is the
-institution already our lead, or registered by another partner? — and an admin approves or rejects it. An approved
+A partner (reseller, distribution partner…) registers a deal for an organisation. The hub checks for overlap — is the
+organisation already our lead, or registered by another partner? — and an admin approves or rejects it. An approved
 registration links the lead to the partner (channel Reseller) and is locked to them for `deal_registration_days`
 (default 60). Won sales count towards upgrading a reseller to distribution partner (`distributor_threshold`).
 """
@@ -32,6 +32,7 @@ from app.models import (
 )
 from app.models.partners import PARTNER_STATUSES
 from app.services.cadence import today_ist
+from app.services.importing.normalise import default_industry, guess_org_type
 
 _ROLE_RANK = {"viewer": 0, "member": 1, "admin": 2}
 ACTIVE_REGISTRATIONS = ("pending", "approved")
@@ -96,7 +97,7 @@ def save_partner(session: Session, data: PartnerData, user: User, partner_id: in
                 raise PartnerError("Pick the partner's company or type its name.")
             org = session.scalar(select(Organisation).where(func.lower(Organisation.name) == name.lower()))
             if org is None:
-                org = Organisation(name=name[:255], org_type="partner")
+                org = Organisation(name=name[:255], org_type="partner", industry="Distribution & resellers")
                 session.add(org)
                 session.flush()
         if session.scalar(select(Partner.id).where(Partner.org_id == org.id)):
@@ -162,7 +163,7 @@ def partners_frame(session: Session) -> pd.DataFrame:
 
 
 def check_overlap(session: Session, org_id: int, partner_id: int | None, today: date | None = None) -> list[str]:
-    """What already exists for this institution: our leads, and other partners' registrations."""
+    """What already exists for this organisation: our leads, and other partners' registrations."""
     today = today or today_ist()
     notes = []
     for track, stage, owner, lead_partner in session.execute(
@@ -204,13 +205,11 @@ def register_deal(session: Session, *, partner_id: int, user: User, org_id: int 
     if org is None:
         name = (new_org_name or "").strip()
         if not name:
-            raise PartnerError("Pick the institution or type its name.")
+            raise PartnerError("Pick the organisation or type its name.")
         org = session.scalar(select(Organisation).where(func.lower(Organisation.name) == name.lower()))
         if org is None:
-            lower = name.lower()
-            org = Organisation(name=name[:255],
-                               org_type="university" if "university" in lower else
-                               "college" if "college" in lower else "other")
+            kind = guess_org_type(name)
+            org = Organisation(name=name[:255], org_type=kind, industry=default_industry(kind))
             session.add(org)
             session.flush()
     if org.id == partner.org_id:
@@ -235,7 +234,7 @@ def register_deal(session: Session, *, partner_id: int, user: User, org_id: int 
 
 def approve_registration(session: Session, reg_id: int, *, track_id: int, user: User, note: str | None = None,
                          today: date | None = None) -> tuple[Lead, str]:
-    """Admin only. Links (or creates) the institution's lead in the track to the partner, locked for N days."""
+    """Admin only. Links (or creates) the organisation's lead in the track to the partner, locked for N days."""
     _require(user, "admin")
     today = today or today_ist()
     reg = session.get(DealRegistration, reg_id)
@@ -248,7 +247,7 @@ def approve_registration(session: Session, reg_id: int, *, track_id: int, user: 
         DealRegistration.org_id == reg.org_id, DealRegistration.partner_id != reg.partner_id,
         DealRegistration.status == "approved", DealRegistration.expires_on >= today))
     if rival is not None:
-        raise PartnerError(f"{rival.partner.organisation.name} holds an approved registration for this institution "
+        raise PartnerError(f"{rival.partner.organisation.name} holds an approved registration for this organisation "
                            f"until {rival.expires_on:%d %b %Y}. Reject this one, or wait until it expires.")
     lead = session.scalar(select(Lead).where(Lead.org_id == reg.org_id, Lead.track_id == track.id))
     message = ""
@@ -314,14 +313,14 @@ def registrations_frame(session: Session, partner_id: int | None = None) -> pd.D
     partner_names = dict(session.execute(select(Partner.id, Organisation.name)
                                          .join(Organisation, Organisation.id == Partner.org_id)).all())
     return pd.DataFrame([{
-        "id": r.id, "Partner": partner_names.get(r.partner_id, ""), "Institution": org, "lead_id": r.lead_id,
+        "id": r.id, "Partner": partner_names.get(r.partner_id, ""), "Organisation": org, "lead_id": r.lead_id,
         "Products": ", ".join(products.get(p, "") for p in (r.product_ids or [])),
         "Expected value (₹)": float(r.expected_value_inr) if r.expected_value_inr is not None else None,
         "Registered": r.registered_on, "Status": r.status.title(), "Locked until": r.expires_on,
         "Overlap found": r.conflict_note or "", "Decision note": r.decision_note or "",
         "Their contact": r.contact_name or "",
     } for r, org in session.execute(query)], columns=[
-        "id", "Partner", "Institution", "lead_id", "Products", "Expected value (₹)", "Registered", "Status",
+        "id", "Partner", "Organisation", "lead_id", "Products", "Expected value (₹)", "Registered", "Status",
         "Locked until", "Overlap found", "Decision note", "Their contact"])
 
 

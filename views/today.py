@@ -57,20 +57,20 @@ def _daily_checks() -> None:
         st.toast(check.auto_started.summary(), icon=":material/rocket_launch:")
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def _load(owner_id: int | None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, int]]:
     with session_scope() as session:
         return (task_frame(session, owner_id=owner_id), ghost_frame(session, owner_id=owner_id),
                 email_batch_frame(session, owner_id), week_summary(session, owner_id))
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _my_targets(user_id: int) -> pd.DataFrame:
     with session_scope() as session:
         return my_week(session, user_id)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _team_and_types() -> tuple[list[tuple[int, str]], list[str], int]:
     with session_scope() as session:
         team = [(u.id, u.name) for u in session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id))]
@@ -89,11 +89,11 @@ def _done(messages: list[str], text: str) -> None:
 @st.dialog("Mark as done", width="large")
 def done_dialog(task: dict) -> None:
     team, types, _ = _team_and_types()
-    st.markdown(f"**{task['Task']}** — {task['Institution']}")
+    st.markdown(f"**{task['Task']}** — {task['Organisation']}")
     bounced = False
     if task["channel"] == "email":
         bounced = st.checkbox("The email bounced (the address doesn't work)",
-                              help="Marks the address as bounced and unverified. If the institution has no other "
+                              help="Marks the address as bounced and unverified. If the organisation has no other "
                                    "verified contact, its cadence stops.")
     if bounced:
         if st.button("Save as bounced", type="primary", icon=":material/mail_lock:"):
@@ -133,7 +133,7 @@ def done_dialog(task: dict) -> None:
 
 @st.dialog("Reschedule")
 def reschedule_dialog(task: dict) -> None:
-    st.markdown(f"**{task['Task']}** — {task['Institution']}")
+    st.markdown(f"**{task['Task']}** — {task['Organisation']}")
     day = st.date_input("New date", value=datetime.now(IST).date() + timedelta(days=1), format="DD/MM/YYYY")
     if st.button("Save", type="primary"):
         with session_scope() as session:
@@ -143,7 +143,7 @@ def reschedule_dialog(task: dict) -> None:
 
 @st.dialog("Skip this task")
 def skip_dialog(task: dict) -> None:
-    st.markdown(f"**{task['Task']}** — {task['Institution']}")
+    st.markdown(f"**{task['Task']}** — {task['Organisation']}")
     reason = st.text_input("Why? (optional)", placeholder="e.g. no phone number, out of office")
     st.caption("A skipped cadence step counts as handled, so the cadence moves on to the next step.")
     if st.button("Skip", type="primary"):
@@ -194,8 +194,8 @@ def task_card(task: dict, show_owner: bool) -> None:
     with card(f"ch{task['channel']}-{key}", "late" if late else "plain"):
         body, actions = st.columns([5, 1.3], vertical_alignment="center", gap="medium")
         title = esc(task["Task"])
-        if task["Institution"]:
-            title += f'<span class="qa-sep">·</span><span style="font-weight:500">{esc(task["Institution"])}</span>'
+        if task["Organisation"]:
+            title += f'<span class="qa-sep">·</span><span style="font-weight:500">{esc(task["Organisation"])}</span>'
         person = " — ".join(x for x in (task["Contact"], task["Designation"]) if x)
         reach = []
         if task["Email"]:
@@ -257,7 +257,7 @@ def task_section(title: str, frame: pd.DataFrame, key: str, show_owner: bool, to
 
 def list_view(frame: pd.DataFrame) -> None:
     """Tick several tasks and act on them together."""
-    columns = ["Bucket", "Due", "Type", "Task", "Institution", "Contact", "Owner"]
+    columns = ["Bucket", "Due", "Type", "Task", "Organisation", "Contact", "Owner"]
     event = st.dataframe(frame[columns], hide_index=True, width="stretch", on_select="rerun",
                          selection_mode="multi-row", key="today_list",
                          height=min(520, 35 * (len(frame) + 1) + 3),
@@ -342,7 +342,7 @@ def handoff_panel(tasks: pd.DataFrame) -> None:
             note = task["Note"].split(":", 1)[1].strip() if HANDOFF_MARK in task["Note"] and ":" in task["Note"] else ""
             html_block(f'<div class="qa-row" style="gap:10px;margin:4px 0">{avatar(who, 30)}<div class="qa-row-main">'
                        f'<div><b>{esc(who)}</b> <span class="qa-muted">· due {day(task["Due"])}</span></div>'
-                       f'<div>{esc(task["Task"])}' + (f' — {esc(task["Institution"])}' if task["Institution"] else "")
+                       f'<div>{esc(task["Task"])}' + (f' — {esc(task["Organisation"])}' if task["Organisation"] else "")
                        + "</div>" + (f'<div class="qa-small qa-muted">“{esc(note)}”</div>' if note else "")
                        + "</div></div>")
 
@@ -380,7 +380,7 @@ def email_batch_panel(batch: pd.DataFrame) -> None:
             if not missing.empty:
                 st.caption(f"{len(missing)} email task(s) have no usable address (missing, bounced or "
                            "do-not-contact):")
-                st.dataframe(missing[["Name", "Institution", "Track", "Step"]], hide_index=True, width="stretch")
+                st.dataframe(missing[["Name", "Organisation", "Track", "Step"]], hide_index=True, width="stretch")
 
 
 def ghost_panel(ghosts: pd.DataFrame) -> None:
@@ -389,7 +389,8 @@ def ghost_panel(ghosts: pd.DataFrame) -> None:
         st.caption("Every follow-up was done. Mark Ghosted (the date is recorded) or keep it open.")
         for row in ghosts.to_dict("records"):
             with st.container(gap=None):
-                st.page_link("views/leads.py", label=f"**{row['Institution']}**", query_params={"lead": row["lead_id"]})
+                st.page_link("views/leads.py", label=f"**{row['Organisation']}**",
+                             query_params={"lead": row["lead_id"]})
                 st.caption(f"{row['Track']} · no reply by {day(pd.Timestamp(row['No reply since']))}")
                 with st.container(horizontal=True, gap="small"):
                     ghost = st.button("Mark Ghosted", key=f"ghost_{row['lead_id']}", disabled=not user.can("member"))
@@ -399,7 +400,7 @@ def ghost_panel(ghosts: pd.DataFrame) -> None:
                 with session_scope() as session:
                     lead, actor = session.get(Lead, int(row["lead_id"])), session.get(User, user.id)
                     (mark_ghosted if ghost else keep_open)(session, lead, actor)
-                _done([], f"{row['Institution']}: " + ("marked Ghosted." if ghost else "kept open."))
+                _done([], f"{row['Organisation']}: " + ("marked Ghosted." if ghost else "kept open."))
 
 
 # ---------------------------------------------------------------- page
@@ -472,7 +473,7 @@ with main:
         if upcoming.empty:
             st.caption("Nothing planned for the next 7 days.")
         else:
-            st.dataframe(upcoming[["Due", "Time", "Type", "Task", "Institution", "Contact", "Owner"]],
+            st.dataframe(upcoming[["Due", "Time", "Type", "Task", "Organisation", "Contact", "Owner"]],
                          hide_index=True, width="stretch",
                          column_config={"Due": st.column_config.DateColumn(format="ddd DD MMM")})
 

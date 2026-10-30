@@ -43,7 +43,7 @@ def test_search_finds_leads_contacts_and_colleges(seeded: Session) -> None:
     hits = search_everything(seeded, "sigma")
     kinds = {(h.kind, h.title) for h in hits}
     assert ("lead", "Sigma University") in kinds
-    assert ("college", "Sigma Degree College") in kinds  # not a lead yet → opens Colleges
+    assert ("org", "Sigma Degree College") in kinds  # not a lead yet → opens Organisations
     assert any(h.kind == "contact" and h.lead_id == lead.id for h in hits)  # a contact opens their lead
     assert [h.title for h in search_everything(seeded, "U-4242") if h.kind == "lead"] == ["Sigma University"]
     assert search_everything(seeded, "s") == []  # too short
@@ -124,7 +124,7 @@ def test_dashboard_metrics_run(seeded: Session) -> None:
     assert all(len(v) == 4 for v in series.values())
     team = team_activity(seeded, period)
     assert "Riya Sharma" in set(team["Person"])
-    assert list(upcoming_demos(seeded).columns) == ["When", "What", "Institution", "Who", "lead_id"]
+    assert list(upcoming_demos(seeded).columns) == ["When", "What", "Organisation", "Who", "lead_id"]
 
 
 def test_html_pieces_escape_text() -> None:

@@ -40,7 +40,7 @@ def _require(user: User | None) -> None:
 def create_task(session: Session, *, title: str, day: date, owner_id: int, user: User, at: time | None = None,
                 org_id: int | None = None, lead_id: int | None = None, type_name: str = "Follow-up task",
                 notes: str | None = None) -> Activity:
-    """A to-do outside the cadences — for any institution, or none ('Finalise reseller payment terms')."""
+    """A to-do outside the cadences — for any organisation, or none ('Finalise reseller payment terms')."""
     _require(user)
     if not title or not title.strip():
         raise TaskError("Give the task a title.")
@@ -108,7 +108,7 @@ def bulk_reschedule(session: Session, activity_ids: list[int], day: date, user: 
 
 # ---------------------------------------------------------------- the daily email batch (for a mail-merge sheet)
 
-EMAIL_BATCH_COLUMNS = ["Task ID", "Lead ID", "Email", "Name", "Designation", "Institution", "Track", "Step",
+EMAIL_BATCH_COLUMNS = ["Task ID", "Lead ID", "Email", "Name", "Designation", "Organisation", "Track", "Step",
                        "Sender mailbox", "Due", "Script", "Subject", "Body"]
 
 
@@ -144,7 +144,7 @@ def email_batch_frame(session: Session, owner_id: int | None, today: date | None
         rows.append({
             "Task ID": activity.id, "Lead ID": activity.lead_id,
             "Email": contact.email if usable else "", "Name": contact.name if contact else "",
-            "Designation": (contact.designation or "") if contact else "", "Institution": org_name or "",
+            "Designation": (contact.designation or "") if contact else "", "Organisation": org_name or "",
             "Track": track or "", "Step": step or activity.title, "Sender mailbox": mailbox or "",
             "Due": ist_date(activity.scheduled_at), "Script": "", "Subject": "", "Body": "",
         })

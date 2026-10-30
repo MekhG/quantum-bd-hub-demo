@@ -58,7 +58,7 @@ def _me(session) -> User:
     return session.get(User, user.id)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> dict:
     with session_scope() as session:
         return {
@@ -69,7 +69,7 @@ def _choices() -> dict:
         }
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _posts() -> pd.DataFrame:
     with session_scope() as session:
         return posts_frame(session)

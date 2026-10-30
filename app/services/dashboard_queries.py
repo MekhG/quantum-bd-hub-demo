@@ -22,6 +22,7 @@ class Dashboard:
     leads_without_activity: int
     stages: pd.DataFrame  # Stage, outcome, sort_order, Leads (every stage, zeros included)
     tracks: pd.DataFrame  # Track, Leads, Clients, NQM
+    industries: pd.DataFrame  # Industry, Organisations, Leads, Clients (biggest first)
 
 
 def _count(session: Session, query) -> int:
@@ -50,6 +51,22 @@ def load_dashboard(session: Session) -> Dashboard:
     ).all()
     tracks = pd.DataFrame(track_rows, columns=["Track", "Leads", "Clients", "NQM"])
 
+    industry = func.coalesce(Organisation.industry, "Not set")
+    org_rows = session.execute(
+        select(industry, func.count(Organisation.id)).where(Organisation.org_type != "individual").group_by(industry)
+    ).all()
+    lead_rows = session.execute(
+        select(industry, func.count(Lead.id), func.coalesce(func.sum(won), 0))
+        .join(Organisation, Organisation.id == Lead.org_id)
+        .join(Stage, Stage.id == Lead.stage_id)
+        .where(Organisation.org_type != "individual")
+        .group_by(industry)
+    ).all()
+    industries = pd.DataFrame(org_rows, columns=["Industry", "Organisations"]).merge(
+        pd.DataFrame(lead_rows, columns=["Industry", "Leads", "Clients"]), on="Industry", how="left").fillna(0)
+    industries[["Leads", "Clients"]] = industries[["Leads", "Clients"]].astype(int)
+    industries = industries.sort_values(["Leads", "Organisations"], ascending=False).reset_index(drop=True)
+
     open_outcomes = ("open", "nurture")
     has_activity = select(Activity.id).where(Activity.lead_id == Lead.id).exists()
     return Dashboard(
@@ -70,4 +87,5 @@ def load_dashboard(session: Session) -> Dashboard:
         ),
         stages=stages,
         tracks=tracks,
+        industries=industries,
     )

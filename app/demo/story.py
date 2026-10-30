@@ -141,6 +141,7 @@ class Story:
         self._library(start)
         self._partners(start + timedelta(days=20))
         self._pool(start + timedelta(days=2))
+        self._enterprise_pool(start + timedelta(days=3))
         self._history_clients()
         self._other_tracks()
         self._first_imports(self.first)
@@ -174,6 +175,9 @@ class Story:
         # College leads start their cadence by themselves once a contact is verified, at most 6 a day.
         fresh = self.track("cold_colleges")
         fresh.auto_start_cadence, fresh.daily_start_cap = True, 6
+        # Enterprise leads start by themselves too once LinkedIn confirms the person, at most 3 a day.
+        enterprise = self.track("enterprise")
+        enterprise.auto_start_cadence, enterprise.daily_start_cap = True, 3
         research, edtech = self.track("research_labs"), self.track("edtech")
         research.sender_mailbox = edtech.sender_mailbox = "partners@demo.example"
         self.track("schools").sender_mailbox = "riya@demo.example"
@@ -206,6 +210,8 @@ class Story:
          "On-site installation, alignment and acceptance testing."),
         ("Faculty product training (2 days)", None, "batch", 50000, 40000,
          "Hands-on training for the faculty who will run the laboratory."),
+        ("Team upskilling workshop (2 days)", None, "batch", 180000, 150000,
+         "Instructor-led quantum computing and quantum-safe networking workshop for up to 30 engineers."),
     )
 
     def _price_list(self, day: date) -> None:
@@ -298,7 +304,7 @@ class Story:
                 CadenceStep.track_id == self.track("cold_colleges").id))}
         fresh = self.track("cold_colleges").id
         scripts = (
-            ("Colleges — intro email", "email", 1, "A quantum teaching lab for {institution}",
+            ("Colleges — intro email", "email", 1, "A quantum teaching lab for {organisation}",
              "{salutation} {last_name},\n\nI lead academic partnerships at Demo. We help departments like yours teach "
              "quantum computing with simulators your students can use from day one.\n\n"
              "Would a 30-minute online demo for your {department} faculty be useful?\n\nBest regards,\n{sender_name}"),
@@ -316,11 +322,11 @@ class Story:
         extra = (
             ("Call opener — heads of department", "call",
              "Hello {salutation} {last_name}, this is {sender_name} from Demo. I wrote to you about a quantum teaching "
-             "lab for {institution}. Do you have two minutes? I'd like to understand what your department teaches "
+             "lab for {organisation}. Do you have two minutes? I'd like to understand what your department teaches "
              "today and whether a short demo would help."),
             ("WhatsApp — after a missed call", "whatsapp",
              "Hello {salutation} {last_name}, {sender_name} from Demo here. I tried calling about the quantum lab for "
-             "{institution}. When would be a good time to talk?"),
+             "{organisation}. When would be a good time to talk?"),
         )
         for title, kind, body in extra:
             script, _ = add_script(self.s, ScriptData(title=title, kind=kind, body=body), self.riya)
@@ -349,9 +355,12 @@ class Story:
                 owner_id=self.riya.id, territory=territory), self.riya)
             org = self.s.get(Organisation, partner.org_id)
             org.website, org.domain = f"https://www.{_slug(name)}.example", f"{_slug(name)}.example"
+            if key == "brightpath":
+                org.industry = "Non-profit & CSR"
             first, last = self.person()
             contact = Contact(org_id=org.id, name=f"{first} {last}", designation="Managing Director",
-                              email=self.email_for(first, last, org.domain), phone=self.phone(), verified=True,
+                              contact_type="Founder/CXO", email=self.email_for(first, last, org.domain),
+                              phone=self.phone(), verified=True,
                               verified_on=day, verified_by_user_id=self.riya.id, source="Partner onboarding")
             self.s.add(contact)
             self.s.flush()
@@ -437,6 +446,93 @@ class Story:
                 break
         return picked
 
+    # ================================================================== companies and public bodies
+
+    _TYPE_LABEL = {"company": "Company", "startup": "Startup", "government": "Government body",
+                   "non_profit": "Non-profit"}
+
+    def _enterprise_pool(self, day: date) -> None:
+        """About 60 companies, startups and public bodies, imported as an organisation list with an Industry
+        column. A third become leads in the Enterprise & public sector track over the twelve weeks."""
+        from app.services.importing.runner import ImportOptions, run_import
+
+        self.at(day, 16)
+        industries = list(N.COMPANY_INDUSTRIES)
+        weights = [w for _, w in N.COMPANY_INDUSTRIES.values()]
+        prefixes = list(N.COMPANY_PREFIXES)
+        self.rng.shuffle(prefixes)
+        states = ("Karnataka", "Telangana", "Maharashtra", "Tamil Nadu", "Delhi", "Haryana", "Gujarat", "Kerala")
+        entries, names = [], set()
+
+        def add(name: str, kind: str, industry: str) -> None:
+            if name in names:
+                return
+            names.add(name)
+            state = self.rng.choice(states)
+            entries.append({"code": None, "name": name, "kind": kind, "industry": industry, "state": state,
+                            "city": self.rng.choice(N.STATES[state]), "domain": f"{_slug(name)}.example",
+                            "tier": "", "university": None})
+
+        for prefix in prefixes:
+            for _ in range(2):
+                industry = self.rng.choices(industries, weights=weights)[0]
+                suffix = self.rng.choice(N.COMPANY_INDUSTRIES[industry][0])
+                add(f"{prefix} {suffix}", "company", industry)
+        for prefix in prefixes[:4]:
+            add(f"{prefix} {self.rng.choice(N.STARTUP_SUFFIXES)}", "startup", "IT & software")
+        for name, kind, industry in N.PUBLIC_BODIES:
+            add(name, kind, industry)
+        entries = entries[:54] + [e for e in entries if e["kind"] != "company"]
+        frame = pd.DataFrame(
+            [[self._TYPE_LABEL[e["kind"]], e["name"], e["industry"], f"https://www.{e['domain']}", e["state"],
+              e["city"]] for e in entries],
+            columns=["Type", "Name", "Industry", "Website", "State", "District"])
+        frame.index = range(2, 2 + len(frame))
+        run_import(self.s, frame, ImportOptions(kind="colleges", list_name="Enterprise prospect list",
+                                                file_name="enterprise_prospects.xlsx"), self.neha, dry_run=False)
+        self.s.flush()
+        self.ent_pool = entries
+        # A couple of startups and public bodies go first, so the track is more than IT companies from day one.
+        startups = [e for e in entries if e["kind"] == "startup"]
+        public = [e for e in entries if e["kind"] in ("government", "non_profit")]
+        companies = [e for e in entries if e["kind"] == "company"]
+        self.rng.shuffle(companies)
+        # A telecom company in the first batch: it becomes the track's scripted win (see _first_imports).
+        telecom = next((e for e in companies if e["industry"] == "Telecom"), None)
+        if telecom is not None:
+            companies.remove(telecom)
+            companies.insert(0, telecom)
+        self.ent_free = startups[:2] + public[:3] + companies
+
+    def take_enterprises(self, n: int) -> list[dict]:
+        picked, self.ent_free = self.ent_free[:n], self.ent_free[n:]
+        return picked
+
+    def business_rows(self, entries: list[dict], owner: User) -> list[list[str]]:
+        rows = []
+        for entry in entries:
+            for _ in range(self.rng.choice((1, 1, 2))):
+                first, last = self.person()
+                ctype, designations, _ = self.rng.choices(N.BUSINESS_DESIGNATIONS,
+                                                          weights=[d[2] for d in N.BUSINESS_DESIGNATIONS])[0]
+                industry = entry["industry"]
+                fit = ["NetSim Q", "QSim Cluster"] if industry in ("Telecom", "Banking & finance",
+                                                                   "Defence & aerospace") else ["QSim Cluster"]
+                rows.append([
+                    owner.name, "New", "", "", f"{entry['city']}, {entry['state']}", self._TYPE_LABEL[entry["kind"]],
+                    entry["name"], industry, f"{first} {last}", self.email_for(first, last, entry["domain"]),
+                    self.phone(), ctype, self.rng.choice(designations), N.BUSINESS_DEPARTMENT[ctype], "", fit[0],
+                    fit[1] if len(fit) > 1 else "", "", f"https://www.{entry['domain']}", "",
+                ])
+        return rows
+
+    def is_business(self, lead: Lead) -> bool:
+        return lead.track.code == "enterprise" or lead.organisation.org_type in ("company", "startup", "government")
+
+    def words(self, lead: Lead, academic, business):
+        """Picks from the academic or the business wording, so a bank's timeline never mentions the HoD."""
+        return self.rng.choice(business if self.is_business(lead) else academic)
+
     # ================================================================== tracker rows (contacts + product fit)
 
     def _fit_for(self, department: str) -> list[str]:
@@ -463,7 +559,7 @@ class Story:
                 fit = self._fit_for(department or "Physics")
                 rows.append([
                     owner.name, "New", entry["tier"], "", f"{entry['city']}, {entry['state']}",
-                    entry["kind"].title(), entry["name"], f"{title}{first} {last}",
+                    entry["kind"].title(), entry["name"], "", f"{title}{first} {last}",
                     self.email_for(first, last, entry["domain"]), self.phone(), ctype,
                     self.rng.choice(designations), department, research, fit[0], fit[1] if len(fit) > 1 else "",
                     entry["code"], f"https://www.{entry['domain']}",
@@ -471,13 +567,13 @@ class Story:
                 ])
         return rows
 
-    TRACKER_COLUMNS = ["Owner", "Status", "Tier", "Potential", "Location", "Type", "Institution Name",
+    TRACKER_COLUMNS = ["Owner", "Status", "Tier", "Potential", "Location", "Type", "Organisation Name", "Industry",
                        "Contact Name", "Email Id", "Contact Number", "Contact Type", "Designation", "Department",
                        "Faculty Research Interests", "Product Fit", "Product Fit 2", "AISHE Code", "Website",
                        "Funding Source"]
 
     def import_tracker(self, rows: list[list[str]], *, track: str, source: str, user: User, file_name: str,
-                       collected: str = "Institution website / public directory") -> list[Lead]:
+                       collected: str = "Organisation website / public directory") -> list[Lead]:
         from app.services.importing.runner import ImportOptions, run_import
 
         frame = pd.DataFrame(rows, columns=self.TRACKER_COLUMNS)
@@ -495,7 +591,7 @@ class Story:
             list(self.s.scalars(select(Lead)))
         for lead in leads:
             self.warmth[lead.id] = self.rng.betavariate(3, 4) if track == "referrals" else \
-                self.rng.betavariate(2, 5)
+                self.rng.betavariate(3.4, 3.4) if track == "enterprise" else self.rng.betavariate(2, 5)
         return leads
 
     # ================================================================== a little history: last year's clients
@@ -589,26 +685,32 @@ class Story:
     def _other_tracks(self) -> None:
         self.at(self.first - timedelta(days=3), 11)
         specs = (
-            ("research_labs", "other", ("Meghavarna Institute for Photonics Research", "Kaushambi Centre for Applied Optics",
+            ("research_labs", "research_institute", ("Meghavarna Institute for Photonics Research",
+                                                     "Kaushambi Centre for Applied Optics",
                                      "Trivenika Advanced Materials Laboratory", "Suryodaya Space Science Institute")),
-            ("edtech", "vendor", ("Learnloop Academy Online", "Qubitly Learning", "Prismline EdTech",
+            ("edtech", "company", ("Learnloop Academy Online", "Qubitly Learning", "Prismline EdTech",
                                    "Corvane Learning Systems")),
-            ("schools", "other", ("Saptaparni Public School", "Indradhanu Senior Secondary School",
+            ("schools", "school", ("Saptaparni Public School", "Indradhanu Senior Secondary School",
                               "Ambarvalley International School", "Hemavati Vidya Mandir", "Rajhans Residential School")),
         )
         roles = {"research_labs": "Lab Director", "edtech": "Partnerships Head", "schools": "Principal"}
+        role_types = {"research_labs": "Director/VP", "edtech": "Director/VP", "schools": "Director/Principal"}
         self.channel_leads: list[int] = []
         for code, org_type, orgs in specs:
             for i, name in enumerate(orgs):
                 state = self.rng.choices(list(N.STATE_WEIGHTS), weights=list(N.STATE_WEIGHTS.values()))[0]
                 domain = f"{_slug(name)}.example"
-                org = Organisation(name=name, org_type=org_type, state=state, city=self.rng.choice(N.STATES[state]),
-                                   website=f"https://www.{domain}", domain=domain)
+                industry = {"research_labs": "Research & development", "edtech": "EdTech",
+                            "schools": "School education"}[code]
+                org = Organisation(name=name, org_type=org_type, industry=industry, state=state,
+                                   city=self.rng.choice(N.STATES[state]), website=f"https://www.{domain}",
+                                   domain=domain)
                 self.s.add(org)
                 self.s.flush()
                 first, last = self.person()
                 contact = Contact(org_id=org.id, name=f"{first} {last}", designation=roles[code],
-                                  contact_type="Other", email=self.email_for(first, last, domain), phone=self.phone(),
+                                  contact_type=role_types[code], email=self.email_for(first, last, domain),
+                                  phone=self.phone(),
                                   verified=True, verified_on=self.first - timedelta(days=3),
                                   verified_by_user_id=self.riya.id, source="Company website")
                 self.s.add(contact)
@@ -680,6 +782,18 @@ class Story:
         self.import_tracker(self.tracker_rows(warm, self.kabir, funding=True), track="referrals",
                             source="Referral", user=self.kabir, file_name="referrals_and_past_contacts.xlsx",
                             collected="Referral / partner")
+        self.at(d, 7, 40)
+        leads = self.import_tracker(self.business_rows(self.take_enterprises(12), self.kabir), track="enterprise",
+                                    source="Enterprise prospect list", user=self.kabir,
+                                    file_name="enterprise_targets.xlsx")
+        # One telecom company goes all the way: reply → brochure → demo → quote → PO.
+        star = next((lead for lead in leads if lead.organisation.industry == "Telecom"), leads[0])
+        self.warmth[star.id] = 0.9
+        self.plan(d + timedelta(days=9), star.id, "reply_win")
+
+    def _do_reply_win(self, lead: Lead, d: date) -> None:
+        self._do_reply(lead, d, scripted=True)
+        self.plan(d + timedelta(days=2), lead.id, "brochure_win")
 
     def _lead_generation(self, d: date) -> None:
         if d == self.first:
@@ -691,6 +805,12 @@ class Story:
                 number = (d - self.first).days // 2 + 1
                 self.import_tracker(self.tracker_rows(batch, self.neha), track="cold_colleges", source="Fresh",
                                     user=self.neha, file_name=f"research_batch_{number:02d}.xlsx")
+        if d.weekday() == 3 and self.ent_free:
+            batch = self.take_enterprises(self.rng.randint(2, 3))
+            self.at(d, 15, self.rng.randint(0, 50))
+            self.import_tracker(self.business_rows(batch, self.kabir), track="enterprise",
+                                source="Enterprise prospect list", user=self.neha,
+                                file_name=f"enterprise_batch_{(d - self.first).days // 7 + 1:02d}.xlsx")
         if d.weekday() == 2 and (d - self.first).days % 14 < 7:
             batch = self.take_institutions(2)
             if batch:
@@ -702,7 +822,8 @@ class Story:
     def _verification(self, d: date) -> None:
         """Neha verifies fresh contacts; Kabir verifies warm ones. A few stay unverified (the data-quality view)."""
         for track, user, per_day in (("cold_colleges", self.neha, self.rng.randint(4, 7)),
-                                     ("referrals", self.kabir, self.rng.randint(1, 3))):
+                                     ("referrals", self.kabir, self.rng.randint(1, 3)),
+                                     ("enterprise", self.kabir, self.rng.randint(1, 3))):
             if d >= self.today - timedelta(days=2):
                 per_day = max(per_day - 3, 0)
             leads = list(self.s.scalars(
@@ -716,7 +837,8 @@ class Story:
                                                                     Contact.verified.is_(False))):
                     if contact.email and self.chance(0.94):
                         contact.verified, contact.verified_on, contact.verified_by_user_id = True, d, user.id
-                        contact.verification_note = "Checked on the department page"
+                        contact.verification_note = ("Checked on LinkedIn" if track == "enterprise"
+                                                     else "Checked on the department page")
                         self.s.add(AuditLog(user_id=user.id, entity="contacts", entity_id=str(contact.id),
                                             action="update", diff={"Verified": [False, True]}))
         self.s.flush()
@@ -805,13 +927,15 @@ class Story:
                     if roll < 0.06:
                         C.skip_activity(self.s, task, owner, "Sent from the shared inbox instead")
                         continue
-                    C.complete_activity(self.s, task, owner, outcome=self.rng.choice(N.EMAIL_OUTCOMES), when=when)
+                    sent = ("Sent", "Sent with the use-case note", "Sent — personalised for their team")
+                    C.complete_activity(self.s, task, owner, when=when,
+                                        outcome=self.words(lead, N.EMAIL_OUTCOMES, sent))
                 else:
                     if self.chance(0.14):
                         C.skip_activity(self.s, task, owner, "Couldn't reach them")
                         continue
-                    C.complete_activity(self.s, task, owner, outcome=self.rng.choice(N.CALL_OUTCOMES), when=when,
-                                        notes=None)
+                    C.complete_activity(self.s, task, owner, when=when, notes=None,
+                                        outcome=self.words(lead, N.CALL_OUTCOMES, N.BUSINESS_CALL_OUTCOMES))
                 self._maybe_reply(lead, d, channel)
                 continue
             # Everything else: follow-ups from next steps, delivery reminders, quote reminders, client reminders.
@@ -886,14 +1010,17 @@ class Story:
             duration_min={"Phone call": 12, "WhatsApp call": 10, "Meeting (online)": 45, "Demo": 60}.get(type_name)),
             user)
 
-    def _do_reply(self, lead: Lead, d: date) -> None:
-        kind = "WhatsApp message" if self.chance(0.25) else "Email"
-        self._log(lead, d, kind, self.owner_of(lead), direction="inbound", notes=self.rng.choice(N.REPLIES),
+    def _do_reply(self, lead: Lead, d: date, *, scripted: bool = False) -> None:
+        kind = "WhatsApp message" if self.chance(0.25) and not self.is_business(lead) else "Email"
+        self._log(lead, d, kind, self.owner_of(lead), direction="inbound",
+                  notes=self.words(lead, N.REPLIES, N.BUSINESS_REPLIES),
                   title=f"{kind} from {(self._contact(lead).name if self._contact(lead) else lead.organisation.name)}",
                   hour=self.rng.randint(9, 18))
         lead.potential = lead.potential or "30-50%"
         self.counts["replies"] += 1
         self.plan(d + timedelta(days=self.rng.choice((0, 1, 1))), lead.id, "respond")
+        if scripted:
+            return
         roll = self.rng.random()
         if roll < 0.74:
             self.plan(d + timedelta(days=self.rng.randint(1, 3)), lead.id, "brochure")
@@ -933,7 +1060,8 @@ class Story:
         if demo_day.weekday() == 6:
             demo_day += timedelta(days=1)
         self._log(lead, d, self.rng.choice(("Phone call", "WhatsApp call")), self.riya,
-                  outcome="Booked an online demo for the department",
+                  outcome="Booked an online demo for the team" if self.is_business(lead)
+                  else "Booked an online demo for the department",
                   next_step=NextStep("Demo", demo_day, at=time(self.rng.choice((11, 14, 15)), 0),
                                      owner_id=presenter.id, title=f"Online demo — {lead.organisation.name}"))
         lead.potential = "50-70%"
@@ -952,11 +1080,11 @@ class Story:
             return
         self.at(d, demo.scheduled_at.astimezone(IST).hour, 0)
         presenter = self.s.get(User, demo.owner_user_id)
-        finish_task(self.s, demo.id, presenter, outcome=self.rng.choice((
+        finish_task(self.s, demo.id, presenter, outcome=self.words(lead, (
             "Demo done — HoD and 6 faculty attended; asked for a quote",
             "Demo done — strong interest from final-year project guides",
             "Demo done — questions on server requirements",
-            "Demo done — principal joined for the last 15 minutes")))
+            "Demo done — principal joined for the last 15 minutes"), N.BUSINESS_DEMO_OUTCOMES))
         C.change_stage(self.s, lead, self.stage("Online Demonstration"), presenter, why="demo held")
         self.counts["demos"] += 1
         roll = self.rng.random()
@@ -968,8 +1096,11 @@ class Story:
             self.plan(d + timedelta(days=self.rng.randint(10, 20)), lead.id, "reject")
 
     def _do_offline_demo(self, lead: Lead, d: date) -> None:
-        self._log(lead, d, "Meeting (in person)", self.arjun, outcome="On-campus demonstration with the kit team",
-                  title=f"Campus visit and demo — {lead.organisation.name}")
+        business = self.is_business(lead)
+        self._log(lead, d, "Meeting (in person)", self.arjun,
+                  outcome="Workshop at their office with the engineering team" if business
+                  else "On-campus demonstration with the kit team",
+                  title=f"{'Office' if business else 'Campus'} visit and demo — {lead.organisation.name}")
         C.change_stage(self.s, lead, self.stage("Offline Demonstration"), self.arjun, why="campus demo")
         self.plan(d + timedelta(days=self.rng.randint(3, 7)), lead.id, "quote")
 
@@ -990,6 +1121,13 @@ class Story:
             mini = "QSim Mini" if "QSim Mini" in fit else "NetSim Mini"
             lines = lines_from_price_items(self.s, [(self.price_items[mini].id, self.rng.randint(1, 3))], basis)
             title = f"{lead.organisation.name} — {mini}"
+        elif self.is_business(lead):
+            picks = [(self.price_items["QSim Cluster"].id, 1),
+                     (self.price_items["Team upskilling workshop (2 days)"].id, 1)]
+            if "NetSim Q" in fit:
+                picks.insert(1, (self.price_items["NetSim Q"].id, 1))
+            lines = lines_from_price_items(self.s, picks, basis)
+            title = f"{lead.organisation.name} — quantum upskilling pilot"
         else:
             lines = lines_from_bundle(self.s, self.bundles["phase1"].id, basis)
             title = f"{lead.organisation.name} — starter simulation lab"
@@ -997,7 +1135,8 @@ class Story:
         route = suggest_route(lead.organisation.management) or "Direct purchase order"
         deal = create_deal(self.s, lead.id, DealData(
             title=title, products=[(self.product(n).id, 1) for n in fit if n in self._products],
-            funding_source="NQM UG teaching lab grant" if lead.nqm_flag else "Institute funds",
+            funding_source="NQM UG teaching lab grant" if lead.nqm_flag else
+            "Company training budget" if self.is_business(lead) else "Institute funds",
             buying_route=route, expected_close=close), self.riya)
         quote = create_quote(self.s, deal.id, QuoteDraft(
             lines=lines, price_basis=basis, discount_pct=Decimal(self.rng.choice((0, 0, 5, 10)))), self.riya, on=d)
@@ -1007,9 +1146,9 @@ class Story:
         self.quotes_by_lead[lead.id] = quote.id
         self.counts["quotes"] += 1
         roll = 0.0 if force_win else self.rng.random()
-        if roll < 0.3:
+        if roll < 0.38:
             self.plan(d + timedelta(days=self.rng.randint(9, 24)), lead.id, "po")
-        elif roll < 0.56:
+        elif roll < 0.6:
             self.plan(d + timedelta(days=self.rng.randint(14, 24)), lead.id, "reject")
         # else: the quote stays open (and may expire) — the Quotes page shows days left
 
@@ -1043,10 +1182,11 @@ class Story:
     def _do_reject(self, lead: Lead, d: date) -> None:
         from app.models import LostReason
 
-        reason = self.rng.choice(list(N.LOST_NOTES))
+        notes = N.BUSINESS_LOST_NOTES if self.is_business(lead) else N.LOST_NOTES
+        reason = self.rng.choice(list(notes))
         lost = self.s.scalar(select(LostReason).where(LostReason.name == reason))
         self.at(d, 15, 20)
-        lead.lost_reason_id, lead.lost_note, lead.potential = lost.id if lost else None, N.LOST_NOTES[reason], "0%"
+        lead.lost_reason_id, lead.lost_note, lead.potential = lost.id if lost else None, notes[reason], "0%"
         C.change_stage(self.s, lead, self.stage("Rejected"), self.riya, why=reason.lower())
         C.stop_if_conversation_moved(self.s, lead, self.riya)
         for task in self.s.scalars(select(Activity).where(Activity.lead_id == lead.id, Activity.status == "planned")):
@@ -1207,7 +1347,8 @@ class Story:
         self.plan(d + timedelta(days=6), lead.id, "demo_win")
 
     def _do_demo_win(self, lead: Lead, d: date) -> None:
-        self._log(lead, d, "Demo", self.arjun, outcome="Demo for the principal and CSE faculty",
+        self._log(lead, d, "Demo", self.arjun, outcome="Demo for the CTO and the network security team"
+                  if self.is_business(lead) else "Demo for the principal and CSE faculty",
                   title=f"Online demo — {lead.organisation.name}")
         C.change_stage(self.s, lead, self.stage("Online Demonstration"), self.arjun, why="demo held")
         self.counts["demos"] += 1
@@ -1225,6 +1366,7 @@ class Story:
         "Funding / grant": "Received a state grant for new teaching labs",
         "FDP / workshop": "Hosted a faculty development programme on quantum computing",
         "Tender / RFQ": "Invited quotations for quantum lab equipment",
+        "Quantum team or programme announced": "Announced a quantum-safe security programme and is hiring for it",
     }
 
     def _signals(self, d: date) -> None:
@@ -1232,13 +1374,17 @@ class Story:
 
         if not self.chance(0.42):
             return
+        tracks = (self.track("cold_colleges").id, self.track("referrals").id, self.track("enterprise").id)
         leads = list(self.s.scalars(select(Lead).join(Stage).where(Stage.outcome.in_(("open", "nurture")),
-                                                                   Lead.track_id.in_((self.track("cold_colleges").id,
-                                                                                      self.track("referrals").id)))))
+                                                                   Lead.track_id.in_(tracks))))
         if not leads:
             return
         lead = self.rng.choice(leads)
-        name = self.rng.choices(list(self.SIGNAL_NOTES), weights=(3, 4, 2, 3, 4, 1))[0]
+        if self.is_business(lead):
+            name = "Tender / RFQ" if lead.organisation.org_type == "government" else \
+                "Quantum team or programme announced"
+        else:
+            name = self.rng.choices(list(self.SIGNAL_NOTES)[:6], weights=(3, 4, 2, 3, 4, 1))[0]
         kind = self._signal_types.get(name)
         if kind is None:
             return

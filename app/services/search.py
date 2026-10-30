@@ -14,7 +14,7 @@ MIN_CHARS = 2
 
 @dataclass(frozen=True)
 class Hit:
-    kind: str           # "lead" / "contact" / "college"
+    kind: str           # "lead" / "contact" / "org"
     title: str
     detail: str
     lead_id: int | None = None
@@ -65,14 +65,13 @@ def search_everything(session: Session, text: str, *, limit: int = 6) -> list[Hi
                         lead_id=lead_id, query=None if lead_id else (email or name)))
 
     has_lead = select(Lead.id).where(Lead.org_id == Organisation.id).exists()
-    college_rows = session.execute(
-        select(Organisation.name, Organisation.state, Organisation.aishe_code, Organisation.org_type)
+    org_rows = session.execute(
+        select(Organisation.name, Organisation.state, Organisation.aishe_code, Organisation.industry)
         .where(~has_lead, or_(Organisation.name.ilike(pattern, escape="\\"),
                               Organisation.aishe_code.ilike(pattern, escape="\\")))
         .order_by(func.length(Organisation.name), Organisation.name)
         .limit(limit)
     ).all()
-    for name, state, code, org_type in college_rows:
-        hits.append(Hit("college", name, " · ".join(x for x in (code, state, (org_type or "").title()) if x),
-                        query=name))
+    for name, state, code, industry in org_rows:
+        hits.append(Hit("org", name, " · ".join(x for x in (industry, code, state) if x), query=name))
     return hits

@@ -1,5 +1,5 @@
 """Events & community: events, the Google Forms import, the community directory, mailing lists, turning a member's
-institution into a lead, and event-participation signals.
+organisation into a lead, and event-participation signals.
 
 Mailing rule (decided 2026-10-21): a member is mailable only with consent, an 18-or-older confirmation and no
 do-not-contact. Everyone else stays on the event record but never appears in mailing lists or outreach exports.
@@ -35,6 +35,7 @@ from app.models import (
 )
 from app.models.community import EVENT_MODES, EVENT_STATUSES, PARTICIPANT_ROLES
 from app.services.cadence import ist_date, today_ist
+from app.services.importing.normalise import default_industry, guess_org_type
 from app.services.privacy import email_hash
 from app.services.signals import add_signal, name_variants, normalise, recompute_scores
 
@@ -172,7 +173,7 @@ FIELDS: dict[str, tuple[str, tuple[str, ...]]] = {
     "phone": ("Phone", ("phone number", "mobile number", "contact number", "phone", "mobile", "whatsapp")),
     "education": ("Education / profession", ("education profession", "education", "profession", "qualification",
                                               "degree", "course", "occupation", "current status", "year of study")),
-    "institution": ("Institution", ("institution", "college", "university", "organisation", "organization",
+    "institution": ("Organisation", ("institution", "college", "university", "organisation", "organization",
                                     "company", "institute", "school")),
     "city": ("City", ("city", "town")),
     "state": ("State", ("state",)),
@@ -296,8 +297,8 @@ def level_for(education: str | None, rules: list[tuple[str, list[re.Pattern[str]
 
 
 class InstitutionMatcher:
-    """Exact matching of a typed institution name against every institution in the hub (name, short form, alias).
-    Close spellings are only tried against institutions that are leads, where a wrong match is easy to spot."""
+    """Exact matching of a typed organisation name against every organisation in the hub (name, short form, alias).
+    Close spellings are only tried against organisations that are leads, where a wrong match is easy to spot."""
 
     def __init__(self, session: Session) -> None:
         self.exact: dict[str, int] = {}
@@ -341,7 +342,7 @@ class Preview:
 
     def frame(self) -> pd.DataFrame:
         return pd.DataFrame([{"Row": r.row, "Status": r.status, "Name": r.values.get("name") or "",
-                              "Email": r.values.get("email") or "", "Institution": r.values.get("institution") or "",
+                              "Email": r.values.get("email") or "", "Organisation": r.values.get("institution") or "",
                               "Team": r.values.get("team_name") or "", "Level": r.values.get("level") or "",
                               "Mailable": bool(r.values.get("consent") and r.values.get("is_adult")),
                               "Note": r.note} for r in self.rows])
@@ -424,7 +425,7 @@ def run_import(session: Session, preview: Preview, *, event_id: int, user: User,
     session.add(batch)
     session.flush()
     stats = {"new members": 0, "updated members": 0, "added to event": 0, "already in event": 0,
-             "matched institutions": 0}
+             "matched organisations": 0}
     source = source or f"Google Form — {event.name}"
     for row in rows:
         v = row.values
@@ -449,7 +450,7 @@ def run_import(session: Session, preview: Preview, *, event_id: int, user: User,
             member.is_adult = bool(v["is_adult"]) or member.is_adult
         if member.org_id is None and member.institution:
             member.org_id = matcher.find(member.institution)
-            stats["matched institutions"] += member.org_id is not None
+            stats["matched organisations"] += member.org_id is not None
         session.flush()
         if created:
             stats["new members"] += 1
@@ -482,7 +483,7 @@ def run_import(session: Session, preview: Preview, *, event_id: int, user: User,
 
 
 def sync_event_signals(session: Session, event_id: int, user: User) -> int:
-    """One 'Event participation' signal per institution (that is a lead) per event, dated the event's start.
+    """One 'Event participation' signal per organisation (that is a lead) per event, dated the event's start.
     Runs after an import of a past event and when an event is marked done. Safe to run again."""
     event = session.get(Event, event_id)
     kind = session.scalar(select(SignalType).where(SignalType.name == SIGNAL_NAME, SignalType.is_active.is_(True)))
@@ -518,12 +519,12 @@ def participants_frame(session: Session, event_id: int) -> pd.DataFrame:
         .where(EventParticipant.event_id == event_id)
         .order_by(func.coalesce(EventParticipant.team_name, "~"), CommunityMember.name)).all()
     return pd.DataFrame([{
-        "id": p.id, "member_id": m.id, "Name": m.name, "Email": m.email, "Institution": m.institution or "",
+        "id": p.id, "member_id": m.id, "Name": m.name, "Email": m.email, "Organisation": m.institution or "",
         "Level": m.level or "", "Team": p.team_name or "", "Role": ROLE_LABELS.get(p.role, p.role),
         "Status": STATUS_LABELS.get(p.status, p.status), "Project": p.project_title or "",
         "Project link": p.project_link or "", "GitHub": m.github_url or "",
         "Mailable": bool(m.consent and m.is_adult and not m.do_not_contact),
-    } for p, m in rows], columns=["id", "member_id", "Name", "Email", "Institution", "Level", "Team", "Role", "Status",
+    } for p, m in rows], columns=["id", "member_id", "Name", "Email", "Organisation", "Level", "Team", "Role", "Status",
                                   "Project", "Project link", "GitHub", "Mailable"])
 
 
@@ -600,8 +601,8 @@ def members_frame(session: Session) -> pd.DataFrame:
         mine = events.get(m.id, [])
         records.append({
             "id": m.id, "Name": m.name, "Email": m.email, "Level": m.level or "", "Education": m.education or "",
-            "Institution": m.institution or "", "In the hub as": org_names.get(m.org_id, ""),
-            "Institution is a lead": m.org_id in leads if m.org_id else False, "org_id": m.org_id,
+            "Organisation": m.institution or "", "In the hub as": org_names.get(m.org_id, ""),
+            "Organisation is a lead": m.org_id in leads if m.org_id else False, "org_id": m.org_id,
             "State": m.state or "", "Interests": m.interests or "", "Events": len(mine),
             "Event names": ", ".join(n for n, _, _ in mine), "Won": sum(1 for *_, s in mine if s == "winner"),
             "GitHub": m.github_url or "", "LinkedIn": m.linkedin_url or "", "Website": m.website_url or "",
@@ -611,7 +612,8 @@ def members_frame(session: Session) -> pd.DataFrame:
             "Added": ist_date(m.created_at),
         })
     return pd.DataFrame(records, columns=[
-        "id", "Name", "Email", "Level", "Education", "Institution", "In the hub as", "Institution is a lead", "org_id",
+        "id", "Name", "Email", "Level", "Education", "Organisation", "In the hub as", "Organisation is a lead",
+        "org_id",
         "State", "Interests", "Events", "Event names", "Won", "GitHub", "LinkedIn", "Website", "Projects", "Mailable",
         "Consent", "18+", "Do not contact", "Added"])
 
@@ -620,7 +622,7 @@ def mailing_list(frame: pd.DataFrame) -> pd.DataFrame:
     """Only mailable members (consent + 18+ + not do-not-contact) — the rule applies to every export for outreach."""
     if frame.empty:
         return frame[["Name", "Email"]] if "Name" in frame else frame
-    return frame.loc[frame["Mailable"], ["Name", "Email", "Institution", "Level", "Interests"]].reset_index(drop=True)
+    return frame.loc[frame["Mailable"], ["Name", "Email", "Organisation", "Level", "Interests"]].reset_index(drop=True)
 
 
 def set_do_not_contact(session: Session, member_id: int, value: bool, user: User) -> None:
@@ -685,7 +687,7 @@ def update_member(session: Session, member_id: int, values: dict, user: User) ->
 
 
 def create_lead_for_member(session: Session, member_id: int, track_id: int, user: User) -> tuple[Lead, str]:
-    """Makes the member's institution a lead in a track (or reuses the existing lead). Adds the institution when
+    """Makes the member's organisation a lead in a track (or reuses the existing lead). Adds the organisation when
     it isn't in the hub yet, and backfills event-participation signals."""
     _require(user)
     member = session.get(CommunityMember, member_id)
@@ -697,15 +699,15 @@ def create_lead_for_member(session: Session, member_id: int, track_id: int, user
     if org is None:
         name = (member.institution or "").strip()
         if not name:
-            raise CommunityError("This person has no institution — add it on their profile first.")
-        lower = name.lower()
-        kind = "university" if "university" in lower else "college" if "college" in lower else "other"
-        org = Organisation(name=name[:255], org_type=kind, state=member.state, city=member.city,
+            raise CommunityError("This person has no organisation — add it on their profile first.")
+        kind = guess_org_type(name)
+        org = Organisation(name=name[:255], org_type=kind, industry=default_industry(kind), state=member.state,
+                           city=member.city,
                            notes=f"Added from the community ({member.name}).")
         session.add(org)
         session.flush()
         member.org_id = org.id
-        note = f"New institution added: {name}. "
+        note = f"New organisation added: {name}. "
     lead = session.scalar(select(Lead).where(Lead.org_id == org.id, Lead.track_id == track.id))
     if lead is not None:
         return lead, note + f"{org.name} is already a lead in {track.name}."
@@ -747,4 +749,4 @@ def community_week(session: Session, first_day: date, last_day: date) -> dict:
         .order_by(func.count(EventParticipant.id).desc()).limit(5)).all()
     return {"events": [{"Event": n, "Type": k, "Date": d.isoformat()} for n, k, d in held],
             "new_members": new_members, "members": total, "mailable": mailable,
-            "top_institutions": [{"Institution": i or "Not given", "Participants": int(c)} for i, c in top]}
+            "top_institutions": [{"Organisation": i or "Not given", "Participants": int(c)} for i, c in top]}

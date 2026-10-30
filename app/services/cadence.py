@@ -36,6 +36,7 @@ from app.models import (
     Track,
     User,
 )
+from app.services.config_cache import remembered
 
 IST = ZoneInfo("Asia/Kolkata")
 TASK_HOUR = time(10, 0)  # planned tasks show at 10:00 IST
@@ -71,19 +72,20 @@ def ist_date(value: datetime | None) -> date | None:
 
 
 def _steps(session: Session, track_id: int) -> list[CadenceStep]:
-    return list(session.scalars(
+    return remembered(session, ("steps", track_id), lambda: list(session.scalars(
         select(CadenceStep).where(CadenceStep.track_id == track_id).order_by(CadenceStep.step_no)
         .options(selectinload(CadenceStep.activity_types))
-    ))
+    )))
 
 
 def _stage(session: Session, name: str) -> Stage | None:
-    return session.scalar(select(Stage).where(func.lower(Stage.name) == name.lower(), Stage.is_active.is_(True)))
+    return remembered(session, ("stage", name.lower()), lambda: session.scalar(
+        select(Stage).where(func.lower(Stage.name) == name.lower(), Stage.is_active.is_(True))))
 
 
 def _first_stage(session: Session) -> Stage:
-    return session.scalar(select(Stage).where(Stage.outcome == "open", Stage.is_active.is_(True))
-                          .order_by(Stage.sort_order).limit(1))
+    return remembered(session, "first_stage", lambda: session.scalar(
+        select(Stage).where(Stage.outcome == "open", Stage.is_active.is_(True)).order_by(Stage.sort_order).limit(1)))
 
 
 def _audit(session: Session, user: User | None, lead: Lead, field_name: str, old: str | None, new: str) -> None:
@@ -98,7 +100,8 @@ def change_stage(session: Session, lead: Lead, stage: Stage, user: User | None, 
         return False
     lead.stage = stage
     lead.stage_changed_at = datetime.now(IST)
-    kind = session.scalar(select(ActivityType).where(ActivityType.name == "Stage change"))
+    kind = remembered(session, "stage_change_type", lambda: session.scalar(
+        select(ActivityType).where(ActivityType.name == "Stage change")))
     if kind is not None:
         session.add(Activity(
             activity_type=kind, lead=lead, org_id=lead.org_id,
@@ -125,10 +128,11 @@ class _Assigner:
     """Who gets each planned task: the admin's task assignments → the lead's owner → whoever started it."""
 
     def __init__(self, session: Session) -> None:
-        self.rules: dict[tuple[int, int], int | None] = {
+        self.rules: dict[tuple[int, int], int | None] = remembered(session, "assignments", lambda: {
             (a.track_id, a.activity_type_id): a.user_id for a in session.scalars(select(TaskAssignment))
-        }
-        self.active = set(session.scalars(select(User.id).where(User.is_active.is_(True))))
+        })
+        self.active = remembered(session, "active_users", lambda: set(
+            session.scalars(select(User.id).where(User.is_active.is_(True)))))
 
     def pick(self, lead: Lead, kind: ActivityType, starter: User | None) -> int | None:
         for candidate in (self.rules.get((lead.track_id, kind.id)), lead.owner_user_id,
@@ -332,7 +336,7 @@ def complete_activity(session: Session, activity: Activity, user: User | None, *
 
 
 def _answers_their_message(session: Session, activity: Activity) -> bool:
-    """True when the institution's latest message to us is newer than anything we've sent since."""
+    """True when the organisation's latest message to us is newer than anything we've sent since."""
     if activity.org_id is None:
         return False
     last_in = session.scalar(select(func.max(Activity.occurred_at)).where(

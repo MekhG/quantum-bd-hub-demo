@@ -1,6 +1,6 @@
 """The inbound query desk: enquiries from the website (hello@demo.example), email, WhatsApp, phone or events.
 
-A new query becomes: an institution (or an 'individual'), a verified contact (they wrote to us), a lead in the
+A new query becomes: an organisation (or an 'individual'), a verified contact (they wrote to us), a lead in the
 Inbound queries track, the enquiry itself on the timeline, and a cadence whose first step is
 the reply — due the day it arrived, overdue after 1 day. Once qualified, the lead moves to its proper track.
 """
@@ -40,7 +40,7 @@ from app.services.cadence import (
     stop_cadence,
     today_ist,
 )
-from app.services.importing.normalise import EMAIL_RE, match_state, parse_phones
+from app.services.importing.normalise import EMAIL_RE, default_industry, guess_org_type, match_state, parse_phones
 from app.services.privacy import email_hash
 
 INBOUND_TRACK = "inbound_queries"
@@ -92,16 +92,18 @@ def create_query(session: Session, query: NewQuery, user: User) -> tuple[Lead, l
     received = query.received_at if query.received_at.tzinfo else query.received_at.replace(tzinfo=IST)
     messages: list[str] = []
 
-    # Institution: chosen, new, or the person themselves (an 'individual', e.g. a Mini-product buyer).
+    # Organisation: chosen, new, or the person themselves (an 'individual', e.g. a Mini-product buyer).
     contact = session.scalar(select(Contact).where(func.lower(Contact.email) == email)) if email else None
     org = session.get(Organisation, query.org_id) if query.org_id else None
     if org is None and query.new_org_name and query.new_org_name.strip():
         org_name = query.new_org_name.strip()
         org = session.scalar(select(Organisation).where(func.lower(Organisation.name) == org_name.lower()))
         if org is None:
-            org = Organisation(name=org_name[:255], org_type="other", state=match_state(query.state))
+            kind = guess_org_type(org_name)
+            org = Organisation(name=org_name[:255], org_type=kind, industry=default_industry(kind),
+                               state=match_state(query.state))
             session.add(org)
-            messages.append(f"New institution added: {org_name}.")
+            messages.append(f"New organisation added: {org_name}.")
     if org is None and contact is not None and contact.org_id:
         org = session.get(Organisation, contact.org_id)
     if org is None:
@@ -184,7 +186,7 @@ def move_lead_track(session: Session, lead_id: int, track_id: int, user: User) -
         return "Already in that track."
     clash = session.scalar(select(Lead.id).where(Lead.org_id == lead.org_id, Lead.track_id == track.id))
     if clash:
-        raise QueryError(f"This institution is already a lead in {track.name} — continue there instead.")
+        raise QueryError(f"This organisation is already a lead in {track.name} — continue there instead.")
     old = lead.track.name
     stopped = stop_cadence(session, lead, user) if lead.cadence_status in IN_CADENCE else None
     lead.track_id = track.id
@@ -215,7 +217,7 @@ def queries_frame(session: Session, *, days: int = 90) -> pd.DataFrame:
     ).all()
     if not rows:
         return pd.DataFrame(columns=["activity_id", "lead_id", "Received", "Channel", "From", "Email", "Phone",
-                                     "Institution", "Message", "Track", "Stage", "Status", "Reply due",
+                                     "Organisation", "Message", "Track", "Stage", "Status", "Reply due",
                                      "First reply after (h)", "Owner"])
     ids = [r[0].id for r in rows]
     people = {aid: c for aid, c in session.execute(
@@ -258,7 +260,7 @@ def queries_frame(session: Session, *, days: int = 90) -> pd.DataFrame:
             "Received": pd.Timestamp(received).tz_convert(IST).tz_localize(None),
             "Channel": activity.title.split(" query —")[0] if " query —" in activity.title else "Other",
             "From": contact.name if contact else "", "Email": (contact.email or "") if contact else "",
-            "Phone": (contact.phone or "") if contact else "", "Institution": org_name or "",
+            "Phone": (contact.phone or "") if contact else "", "Organisation": org_name or "",
             "Message": activity.notes or "", "Track": track or "", "Stage": stage or "", "Status": status,
             "Reply due": pd.Timestamp(received + REPLY_TARGET).tz_convert(IST).tz_localize(None),
             "First reply after (h)": round((first_reply - pd.Timestamp(received)).total_seconds() / 3600, 1)

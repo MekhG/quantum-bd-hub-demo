@@ -125,7 +125,7 @@ def test_reimporting_the_same_tracker_creates_no_duplicates(seeded: Session) -> 
     assert count(seeded, Organisation) == 1
     assert count(seeded, Contact) == 3
     assert count(seeded, Lead) == 1
-    assert second.counts["Institutions matched"] == 1
+    assert second.counts["Organisations matched"] == 1
     assert second.counts["Contacts matched"] == 3
 
 
@@ -264,10 +264,10 @@ def test_raw_college_list_and_research_round_trip(seeded: Session) -> None:
         ["College", "C-11111", "Zeta College of Engineering", "", "Telangana", "Hyderabad", ""],
     ])
     preview = run(seeded, data, "colleges", track=None, dry_run=True)
-    assert preview.counts["Institutions created"] == 2 and not preview.errors
+    assert preview.counts["Organisations created"] == 2 and not preview.errors
     assert preview.counts["Repeated rows in this upload (skipped)"] == 1
     report = run(seeded, data, "colleges", track=None)
-    assert report.counts["Institutions created"] == 2
+    assert report.counts["Organisations created"] == 2
     zeta = seeded.scalar(select(Organisation).where(Organisation.aishe_code == "C-11111"))
     assert zeta.domain == "zeta-example.ac.in" and zeta.affiliated_university == "Osmania University"
     assert count(seeded, Lead) == 0  # the raw list is a prospect pool, not leads
@@ -308,7 +308,7 @@ def test_undo_keeps_records_other_work_depends_on(seeded: Session) -> None:
 def test_missing_required_column_is_reported(seeded: Session) -> None:
     data = frame(["Contact Name", "Email Id"], [["A", "a@b-example.ac.in"]])
     report = run(seeded, data, "tracker")
-    assert report.errors and "Institution Name" in report.errors[0].message
+    assert report.errors and "Organisation Name" in report.errors[0].message
 
 
 # ---------- smaller pieces ----------
@@ -500,7 +500,7 @@ def test_same_name_colleges_with_different_aishe_codes_stay_separate(seeded: Ses
     report = run(seeded, data, "colleges", track=None)
     assert not report.errors and count(seeded, Organisation) == 3
     again = run(seeded, data, "colleges", track=None)
-    assert again.counts["Institutions matched"] == 3 and count(seeded, Organisation) == 3
+    assert again.counts["Organisations matched"] == 3 and count(seeded, Organisation) == 3
 
 
 def test_bare_name_column_is_the_contact(seeded: Session) -> None:

@@ -2,7 +2,7 @@
 
 Definitions (also shown as help text on the page):
 
-- Outreach: institutions contacted for the first time — leads whose very first outbound touch (email, call, WhatsApp,
+- Outreach: organisations contacted for the first time — leads whose very first outbound touch (email, call, WhatsApp,
   LinkedIn, meeting, demo) falls in the week. Touches on that first day count as outreach, not follow-ups.
 - Follow-ups: every later outbound touch in the week, split into calls (phone and WhatsApp calls), emails,
   WhatsApp & LinkedIn messages, and meetings & demos.
@@ -11,7 +11,7 @@ Definitions (also shown as help text on the page):
   week shows what was true then.
 - Deals won: purchase orders dated in the week (with value); deals lost: leads moved to a lost stage in the week.
 - Pipeline: sent quotations still valid, excluding GST (and weighted by each lead's Potential).
-- Segments: public / private (from the institution's management) × urban / rural (from its area).
+- Segments: public / private (from the organisation's management) × urban / rural (from its area).
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ def bucket_for(channel: str, type_name: str) -> str:
 
 
 def _first_touch_days(session: Session) -> tuple[dict[int, date], dict[int, date]]:
-    """First outbound touch day per lead, and per institution for touches logged without a lead."""
+    """First outbound touch day per lead, and per organisation for touches logged without a lead."""
     done = (Activity.status == "done", Activity.direction == "outbound", ActivityType.name.not_in(HIDDEN_TYPES))
     by_lead = {lid: ist_date(when) for lid, when in session.execute(
         select(Activity.lead_id, func.min(Activity.occurred_at)).join(ActivityType, ActivityType.id == Activity.type_id)
@@ -259,8 +259,8 @@ def _deals(session: Session, start: datetime, end: datetime, first_day: date, la
         .join(Lead, Lead.id == Opportunity.lead_id).join(Organisation, Organisation.id == Lead.org_id)
         .where(Opportunity.status == "won", Opportunity.po_date >= first_day, Opportunity.po_date <= last_day)
         .order_by(Opportunity.po_date)).all()
-    won_frame = pd.DataFrame([{"Institution": n, "Deal": t, "Value (₹)": float(v or 0), "PO date": d}
-                              for n, t, v, d in won], columns=["Institution", "Deal", "Value (₹)", "PO date"])
+    won_frame = pd.DataFrame([{"Organisation": n, "Deal": t, "Value (₹)": float(v or 0), "PO date": d}
+                              for n, t, v, d in won], columns=["Organisation", "Deal", "Value (₹)", "PO date"])
     lost_names = set(session.scalars(select(Stage.name).where(Stage.outcome == "lost")))
     moves = _stage_changes(session, after=start)
     if not moves.empty:
@@ -272,8 +272,8 @@ def _deals(session: Session, start: datetime, end: datetime, first_day: date, la
                               .outerjoin(LostReason, LostReason.id == Lead.lost_reason_id)
                               .where(Lead.id == lead_id)).first()
         if row:
-            lost_rows.append({"Institution": row[0], "Reason": row[1] or "Not given", "Note": row[2] or ""})
-    return won_frame, pd.DataFrame(lost_rows, columns=["Institution", "Reason", "Note"])
+            lost_rows.append({"Organisation": row[0], "Reason": row[1] or "Not given", "Note": row[2] or ""})
+    return won_frame, pd.DataFrame(lost_rows, columns=["Organisation", "Reason", "Note"])
 
 
 def pipeline_now(session: Session, today: date | None = None) -> tuple[float, float, int]:
@@ -518,7 +518,7 @@ def notes_for_week(session: Session, week_start: date) -> list[dict]:
 
 
 HEADLINES = (
-    ("outreach", "Outreach", "Institutions contacted for the first time this week."),
+    ("outreach", "Outreach", "Organisations contacted for the first time this week."),
     ("followup:Calls", "Follow-up calls", "Phone and WhatsApp calls after the first contact."),
     ("followup:Emails", "Follow-up emails", "Emails after the first contact."),
     ("replies", "Replies", "Messages they sent us: replies and new enquiries."),
@@ -614,14 +614,14 @@ def build_report(session: Session, week_start: date, today: date | None = None) 
                    "pipeline": total, "pipeline_weighted": weighted, "open_quotes": open_quotes,
                    "new_signals": new_signals, "pipeline_as_of": (as_of if is_current else today).isoformat()},
         "stages": records(stage_frame, ["Stage", "Leads", "Moved in this week", "outcome"]),
-        "won": records(won, ["Institution", "Deal", "Value (₹)", "PO date"]),
-        "lost": records(lost, ["Institution", "Reason", "Note"]),
+        "won": records(won, ["Organisation", "Deal", "Value (₹)", "PO date"]),
+        "lost": records(lost, ["Organisation", "Reason", "Note"]),
         "people": records(people, ["Person", "New leads", "Contacts verified", "Outreach", "Follow-up calls",
                                    "Follow-up emails", "Other follow-ups", "Replies", "Demos", "Quotes"]),
         "targets": records(progress, ["Person", "Metric", "Target", "Actual", "Progress"]),
         "segments": records(segment_frame, list(segment_frame.columns)) if not segment_frame.empty else [],
         "trend": {"labels": labels, "Outreach": outreach_trend, "Follow-ups": follow_trend, "Replies": reply_trend},
-        "hot": records(hot, ["Institution", "Track", "Stage", "Score"]),
+        "hot": records(hot, ["Organisation", "Track", "Stage", "Score"]),
         "notes": notes_for_week(session, week_start),
         "community": _community(session, week_start),
         "content": _content(session, week_start),

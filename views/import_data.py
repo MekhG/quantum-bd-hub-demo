@@ -34,21 +34,22 @@ page_header(
 )
 
 KIND_HELP = {
-    "tracker": "One row per contact. Rows for the same institution become one lead with several contacts.",
-    "responses": "Each row is logged as a dated response on the institution's timeline. Needs Date and Source.",
-    "clients": "Each row marks the institution as a client (Deal PO Released). With a PO date and products, "
+    "tracker": "One row per contact. Rows for the same organisation become one lead with several contacts.",
+    "responses": "Each row is logged as a dated response on the organisation's timeline. Needs Date and Source.",
+    "clients": "Each row marks the organisation as a client (Deal PO Released). With a PO date and products, "
                "delivery due dates and follow-ups are added too.",
-    "mini": "Your Mini products tracker: one row per person (or institution). Goes into the Mini products track; "
-            "people without an institution are saved as individuals.",
-    "colleges": "A raw college list (AISHE). Becomes the prospect pool on the Colleges page — not leads yet. "
-                "Importing several overlapping lists is fine: they're matched by AISHE code.",
+    "mini": "Your Mini products tracker: one row per person (or organisation). Goes into the Mini products track; "
+            "people without an organisation are saved as individuals.",
+    "colleges": "A list of organisations — an AISHE college list, a list of companies, schools or labs. They "
+                "appear on the Organisations page (not leads yet). Add an Industry column to file each one; "
+                "overlapping lists are fine, they're matched by AISHE code, website domain or name.",
 }
 DEFAULT_METHOD = {
-    "tracker": "Institution website / public directory",
+    "tracker": "Organisation website / public directory",
     "responses": "They contacted us (enquiry / reply)",
     "clients": "Existing customer (gave details for the purchase)",
     "mini": "They contacted us (enquiry / reply)",
-    "colleges": "Institution website / public directory",
+    "colleges": "Organisation website / public directory",
 }
 
 with session_scope() as session:
@@ -111,7 +112,7 @@ with st.container(border=True):
             help="Tick only if the emails in this sheet have been checked. Only verified contacts can enter email cadences.",
         )
         fill_down = left.checkbox(
-            "Institution name is only on the first row of each group (fill it down)", value=False,
+            "Organisation name is only on the first row of each group (fill it down)", value=False,
             help="For sheets like 'Tier2&3 State Uni' where the next rows under a university are its other contacts.",
         )
     if kind == "clients":
@@ -183,8 +184,8 @@ if sheets:
     if kind == "colleges":
         stem = source_name.rsplit(".", 1)[0]
         list_name = st.text_input(
-            "List name (tags every institution in this upload)", value=stem,
-            help="Lets you filter the Colleges page by list later, e.g. 'Rural colleges' or 'Vidyalaxmi'.",
+            "List name (tags every organisation in this upload)", value=stem,
+            help="Lets you filter the Organisations page by list later, e.g. 'Rural colleges' or 'Telecom companies'.",
         ).strip() or None
 
     options = ImportOptions(
@@ -261,7 +262,7 @@ if sheets:
             st.session_state["import_result"] = result
             if result.batch_id:
                 st.session_state.pop(f"paste_{kind}", None)  # empty the paste box so rows aren't imported twice
-            st.cache_data.clear()  # so the Leads and Colleges pages show the new rows straight away
+            st.cache_data.clear()  # so the Leads and Organisations pages show the new rows straight away
             st.rerun()
 
     finished: ImportReport | None = st.session_state.pop("import_result", None)
@@ -289,7 +290,7 @@ else:
         if open_batches:
             with st.expander("Undo an import"):
                 st.caption(
-                    "Deletes the institutions, contacts, leads, responses and deals that import created — "
+                    "Deletes the organisations, contacts, leads, responses and deals that import created — "
                     "unless something added later depends on them. Blanks it filled in and stage changes stay."
                 )
                 batch_id = st.selectbox("Import to undo", open_batches, format_func=lambda i: f"#{i}")

@@ -79,7 +79,7 @@ def test_the_story_ends_today_with_work_to_do(demo_db: str) -> None:
     engine.dispose()
     assert due_today >= 5
     assert latest in (str(TODAY), str(TODAY - timedelta(days=1)))
-    assert tracks_with_leads == 7
+    assert tracks_with_leads == 8
     assert {"posted", "review", "approved", "idea"} <= set(posts)
     assert finals >= 3 and pending_regs == 1 and hot >= 1
 

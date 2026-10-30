@@ -22,7 +22,7 @@ user = require_user()
 FLASH = "edit_flash"
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _clients() -> pd.DataFrame:
     with session_scope() as session:
         return installations_frame(session)

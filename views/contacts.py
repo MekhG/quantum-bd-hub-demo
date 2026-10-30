@@ -23,18 +23,18 @@ from app.services.importing.runner import COLLECTION_METHODS
 from app.services.lead_queries import contacts_frame, frame_to_xlsx
 from app.ui.common import require_user
 from app.ui.edit_table import edit_table
-from app.ui.layout import as_list_column, blank_missing_text, empty_state, page_header
+from app.ui.layout import as_list_column, blank_missing_text, empty_state, filter_industry, industry_filter, page_header
 
 user = require_user()
 
 
-@st.cache_data(ttl=60, show_spinner="Loading contacts…")
+@st.cache_data(ttl=3600, show_spinner="Loading contacts…")
 def load_contacts() -> pd.DataFrame:
     with session_scope() as session:
         return contacts_frame(session)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_dropdowns() -> dict[str, list[str]]:
     with session_scope() as session:
         return dropdown_values(session)
@@ -43,14 +43,14 @@ def load_dropdowns() -> dict[str, list[str]]:
 @st.dialog("Add a contact", width="large")
 def add_contact_dialog() -> None:
     choices = load_dropdowns()
-    search = st.text_input("Institution", placeholder="Type at least 3 letters of the name, e.g. Andhra",
+    search = st.text_input("Organisation", placeholder="Type at least 3 letters of the name, e.g. Swarna",
                            icon=":material/search:")
     with session_scope() as session:
         matches = institution_choices(session, search)
     if search and len(search.strip()) >= 3 and not matches:
-        st.caption("No institution found. New institutions come in through Import (paste a row with the "
-                   "institution and contact).")
-    org_id = st.selectbox("Pick the institution", [m[0] for m in matches],
+        st.caption("No organisation found. New organisations come in through Import (paste a row with the "
+                   "organisation and contact).")
+    org_id = st.selectbox("Pick the organisation", [m[0] for m in matches],
                           format_func=dict(matches).get, index=None, placeholder="Choose from the matches",
                           disabled=not matches)
     left, right = st.columns(2)
@@ -86,7 +86,7 @@ def add_contact_dialog() -> None:
 
 head, tools = st.columns([4, 1.4], vertical_alignment="bottom")
 with head:
-    page_header("Contacts", "Everyone we're talking to, across all institutions and tracks.", eyebrow="Pipeline")
+    page_header("Contacts", "Everyone we're talking to, across all organisations and tracks.", eyebrow="Pipeline")
 with tools:
     edit_mode = st.toggle("Edit mode", key="contacts_edit", disabled=not user.can("member"),
                           help="Correct emails, phones, designations, mark verified or do-not-contact.")
@@ -110,29 +110,34 @@ def options(column: str) -> list[str]:
     return sorted(x for x in contacts[column].dropna().unique() if x)
 
 
-_MORE = ("k_departments", "k_states", "k_verified", "k_dnc")
+_MORE = ("k_departments", "k_states", "k_org_types", "k_verified", "k_dnc")
 more_active = sum(bool(st.session_state.get(k)) for k in _MORE if st.session_state.get(k) not in (None, "Any"))
 track_names = sorted({t for cell in contacts["Tracks"] for t in cell.split(", ") if t})
 
 with st.container(border=True):
+    industries = industry_filter(contacts, key="k_industry")
     r1 = st.columns([2, 1.3, 1.3, 1.2])
-    search = r1[0].text_input("Search", placeholder="Name, email, phone or institution", icon=":material/search:",
+    search = r1[0].text_input("Search", placeholder="Name, email, phone or organisation", icon=":material/search:",
                                 value=st.query_params.get("q", ""))  # ?q= comes from the top-bar search
     tracks = r1[1].multiselect("Track", track_names, placeholder="All tracks")
     types = r1[2].multiselect("Contact type", options("Contact type"), placeholder="All types")
     with_email = r1[3].selectbox("Has", ["Anything", "Email", "Phone", "Email and phone", "No email"])
     with st.expander(f"More filters ({more_active} on)" if more_active else "More filters"):
         r2 = st.columns(4)
-        departments = r2[0].multiselect("Department", options("Department"), key="k_departments")
-        states = r2[1].multiselect("State", options("State"), key="k_states")
-        verified = r2[2].selectbox("Verified", ["Any", "Verified", "Not verified"], key="k_verified")
-        include_dnc = r2[3].toggle("Include do-not-contact", key="k_dnc")
+        org_types = r2[0].multiselect("Organisation type", options("Org type"), key="k_org_types",
+                                      help="Company, University, School, Research institute…")
+        departments = r2[1].multiselect("Department", options("Department"), key="k_departments")
+        states = r2[2].multiselect("State", options("State"), key="k_states")
+        verified = r2[3].selectbox("Verified", ["Any", "Verified", "Not verified"], key="k_verified")
+        include_dnc = st.toggle("Include do-not-contact", key="k_dnc")
 
-view = contacts
+view = filter_industry(contacts, industries)
+if org_types:
+    view = view[view["Org type"].isin(org_types)]
 if search:
     needle = search.strip().lower()
     haystack = (view["Name"].fillna("") + " " + view["Email"].fillna("") + " " + view["Phone"].fillna("") + " "
-                + view["Institution"].fillna("")).str.lower()
+                + view["Organisation"].fillna("")).str.lower()
     view = view[haystack.str.contains(needle, regex=False)]
 if tracks:
     view = view[view["Tracks"].str.split(", ").apply(lambda ts: any(t in ts for t in tracks))]
@@ -152,12 +157,13 @@ view = {"Email": view[has_email], "Phone": view[has_phone], "Email and phone": v
 
 m = st.columns(4)
 m[0].metric("Contacts shown", f"{len(view):,}", border=True, icon=":material/contacts:")
-m[1].metric("Institutions", f"{view['Institution'].nunique():,}", border=True, icon=":material/account_balance:")
+m[1].metric("Organisations", f"{view['Organisation'].nunique():,}", border=True, icon=":material/domain:")
 m[2].metric("Verified", f"{int(view['Verified'].sum()):,}", border=True, icon=":material/verified:")
 m[3].metric("With phone", f"{int((view['Phone'].fillna('') != '').sum()):,}", border=True, icon=":material/call:")
 
-columns = ["Name", "Institution", "Contact type", "Designation", "Department", "Email", "Phone", "LinkedIn",
-           "Research interests", "Verified", "Email status", "Do not contact", "Notes", "Tracks", "State", "Source"]
+columns = ["Name", "Organisation", "Industry", "Contact type", "Designation", "Department", "Email", "Phone",
+           "LinkedIn", "Research interests", "Verified", "Email status", "Do not contact", "Notes", "Tracks", "State",
+           "Source"]
 
 if edit_mode:
     choices = load_dropdowns()
@@ -175,7 +181,7 @@ if edit_mode:
         height=min(560, 35 * (len(grid) + 1) + 3),
         column_config={
             "Name": st.column_config.TextColumn(pinned=True, width="medium", required=True),
-            "Institution": st.column_config.TextColumn(width="medium"),
+            "Organisation": st.column_config.TextColumn(width="medium"),
             "Contact type": st.column_config.SelectboxColumn(options=choices.get("contact_type", [])),
             "Email": st.column_config.TextColumn(width="medium"),
             "Verified": st.column_config.CheckboxColumn(width="small"),
@@ -199,7 +205,7 @@ event = st.dataframe(
     key="contacts_table",
     column_config={
         "Name": st.column_config.TextColumn(pinned=True, width="medium"),
-        "Institution": st.column_config.TextColumn(width="medium"),
+        "Organisation": st.column_config.TextColumn(width="medium"),
         "Email": st.column_config.TextColumn(width="medium"),
         "LinkedIn": st.column_config.LinkColumn(display_text="Profile"),
         "Verified": st.column_config.CheckboxColumn(width="small"),

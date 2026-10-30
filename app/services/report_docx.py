@@ -296,7 +296,7 @@ def report_docx(report: dict, *, template: bytes, comments: dict[str, str | None
         f"{inr(totals['won_value'], decimals=False)}.",
     ]
     if rate is not None:
-        lines.append(f"Reply rate: {rate:.0%} of the {totals['reply_cohort']} institutions first contacted in the "
+        lines.append(f"Reply rate: {rate:.0%} of the {totals['reply_cohort']} organisations first contacted in the "
                      "last four weeks have written back.")
     lines.append(f"New signals saved: {totals['new_signals']}.")
     for line in lines:
@@ -304,7 +304,7 @@ def report_docx(report: dict, *, template: bytes, comments: dict[str, str | None
 
     # 2. Outreach and follow-ups.
     _heading(doc, "2. Outreach and follow-ups")
-    _para(doc, f"{tiles[0]['now']:,} institution(s) contacted for the first time ({totals['outreach_messages']:,} "
+    _para(doc, f"{tiles[0]['now']:,} organisation(s) contacted for the first time ({totals['outreach_messages']:,} "
                f"message(s) and calls on their first day) and {totals['followups']:,} follow-up(s), against "
                f"{totals['followups_before']:,} last week.", size=10)
     _picture(doc, followup_chart(report["followups"]))

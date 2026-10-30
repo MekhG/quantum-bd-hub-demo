@@ -38,7 +38,8 @@ from app.services.privacy import email_hash
 _ALL_PRODUCTS = {"all 5", "all five", "all products", "all 5 products", "all five products"}
 
 # When a contact type names two roles ('HOD / Professor'), file it under the more senior one.
-CONTACT_TYPE_PRIORITY = ["Director/Principal", "Dean", "Registrar", "HoD", "Purchase/Admin", "Faculty", "Other"]
+CONTACT_TYPE_PRIORITY = ["Founder/CXO", "Director/Principal", "Director/VP", "Dean", "Registrar", "HoD", "L&D/HR",
+                         "Purchase/Admin", "Manager", "Faculty", "Engineer/Scientist", "Other"]
 
 
 @dataclass
@@ -49,7 +50,7 @@ class OrgMatch:
 
 
 class OrgIndex:
-    """Finds an institution by AISHE code → web/email domain → name + state → name (only if unique)."""
+    """Finds an organisation by AISHE code → web/email domain → name + state → name (only if unique)."""
 
     def __init__(self) -> None:
         self.by_aishe: dict[str, Any] = {}

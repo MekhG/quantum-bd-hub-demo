@@ -129,3 +129,60 @@ LOST_NOTES = {
     "Competitor": "Went with another vendor's simulator.",
     "Procurement block": "Purchase committee wants a GeM listing.",
 }
+
+# ---- companies and public bodies (the Enterprise & public sector track) ----
+# Invented brand-like words, checked against well-known Indian company names.
+COMPANY_PREFIXES = (
+    "Arkavane", "Velmora", "Zentrique", "Corvista", "Lumetra", "Nexaro", "Quillon", "Trivexa", "Orbisol", "Halvora",
+    "Kestrion", "Mirevo", "Talvex", "Oriqa", "Brindale", "Saravex", "Ilumira", "Vantoria", "Peralta Ridge", "Cendrix",
+    "Amberline", "Torvane", "Nimbara", "Ostrava Bay", "Kairavi", "Elvaro", "Rudrava", "Sylvane", "Zephyrine", "Darvona",
+)
+# Industry → (suffixes, weight). The industry names match the seeded 'industry' list.
+COMPANY_INDUSTRIES: dict[str, tuple[tuple[str, ...], int]] = {
+    "IT & software": (("Technologies", "Software Labs", "Digital Systems", "Infotech", "Cloud Services"), 12),
+    "Telecom": (("Telecom", "Networks", "Communications"), 7),
+    "Banking & finance": (("Bank", "Capital", "Financial Services", "Fintech"), 8),
+    "Defence & aerospace": (("Aerospace", "Defence Systems", "Avionics"), 6),
+    "Manufacturing": (("Semiconductors", "Electronics", "Precision Instruments"), 6),
+    "Healthcare & pharma": (("Pharma", "Life Sciences", "Biotech"), 4),
+    "Energy & utilities": (("Power", "Energy", "Grid Solutions"), 3),
+}
+# Public bodies and foundations, made up: (name, type, industry).
+PUBLIC_BODIES = (
+    ("Vasundhara State Electronics Mission", "government", "Government & public sector"),
+    ("Saptadweep Port Authority", "government", "Government & public sector"),
+    ("Tamraparni Grid Corporation", "government", "Energy & utilities"),
+    ("Indus Skills Innovation Council", "government", "Government & public sector"),
+    ("Saptarishi STEM Foundation", "non_profit", "Non-profit & CSR"),
+    ("Ketaki Learning Trust", "non_profit", "Non-profit & CSR"),
+)
+STARTUP_SUFFIXES = ("Quantum", "Q Labs", "Photonics", "Qubits")
+BUSINESS_DESIGNATIONS = (
+    ("Founder/CXO", ("Chief Technology Officer", "Co-founder & CTO", "Chief Information Officer"), 12),
+    ("Director/VP", ("VP Engineering", "Director of Innovation", "Head of R&D"), 22),
+    ("L&D/HR", ("Head of Learning & Development", "L&D Manager", "Talent Development Lead"), 24),
+    ("Manager", ("Innovation Manager", "Programme Manager, Emerging Tech", "Engineering Manager"), 22),
+    ("Engineer/Scientist", ("Principal Engineer", "Quantum Research Scientist", "Senior Data Scientist"), 20),
+)
+BUSINESS_DEPARTMENT = {"Founder/CXO": "", "Director/VP": "Innovation lab", "L&D/HR": "Learning & Development",
+                       "Manager": "Innovation lab", "Engineer/Scientist": "Engineering"}
+BUSINESS_REPLIES = (
+    "We're looking at quantum-safe networking this year. Could you share what NetSim Q covers?",
+    "Our L&D team is planning a quantum computing track for engineers. Can we see a demo?",
+    "Please send pricing for a 30-seat team licence and a two-day workshop.",
+    "Interesting — could you do a short call with our innovation lab next week?",
+    "Can the simulator run on our private cloud? Please share the technical requirements.",
+    "Forwarded to our CTO. We'd like to understand the upskilling programme first.",
+)
+BUSINESS_CALL_OUTCOMES = ("Spoke to L&D; asked for the programme outline", "No answer; left a message",
+                          "Busy this quarter — call back after the release", "Interested; wants a demo for the team",
+                          "Forwarding to the CTO's office", "Asked about pricing for 30 seats")
+BUSINESS_DEMO_OUTCOMES = ("Demo done — CTO and four engineers attended; asked for a team quote",
+                          "Demo done — L&D wants a pilot for 30 engineers",
+                          "Demo done — questions on running it on their private cloud",
+                          "Demo done — security team keen on the quantum-safe labs")
+BUSINESS_LOST_NOTES = {
+    "Budget": "Training budget is frozen until the next financial year.",
+    "Timing": "Busy with a product release; asked us to come back next quarter.",
+    "Competitor": "Chose another vendor's online course.",
+}

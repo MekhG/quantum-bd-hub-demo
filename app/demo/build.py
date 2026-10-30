@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import Date, DateTime, create_engine, event
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from app.config import DEMO_DB_PATH, normalise_url
 from app.models import Base
@@ -83,13 +84,34 @@ def _preload() -> None:
     from app.services import privacy_requests, report_docx, report_metrics  # noqa: F401
 
 
+def _copy_to_file(engine, path: Path) -> None:
+    """Writes the in-memory database to `path` with SQLite's own backup (a consistent, page-by-page copy)."""
+    import sqlite3
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+    raw = engine.raw_connection()
+    try:
+        destination = sqlite3.connect(path)
+        try:
+            raw.driver_connection.backup(destination)
+        finally:
+            destination.close()
+    finally:
+        raw.close()
+
+
 def build(url: str, *, today: date, days: int = DEFAULT_DAYS, seed: int = 2026, quiet: bool = False) -> dict:
     from app.demo.story import Story
 
     _preload()
 
     started = clock_time.monotonic()
-    engine = create_engine(url)
+    # A SQLite file is built in memory and copied to disk at the end: thousands of small writes never touch the
+    # disk (cloud volumes can be slow). Postgres is written to directly.
+    target = url.removeprefix("sqlite:///") if url.startswith("sqlite:///") else None
+    engine = create_engine("sqlite://", poolclass=StaticPool) if target else create_engine(url)
     if url.startswith("sqlite"):
         @event.listens_for(engine, "connect")
         def _fks(dbapi_connection, _record) -> None:
@@ -107,6 +129,8 @@ def build(url: str, *, today: date, days: int = DEFAULT_DAYS, seed: int = 2026, 
             session.commit()
     finally:
         clock.stop()
+    if target:
+        _copy_to_file(engine, Path(target))
     engine.dispose()
     summary["seconds"] = round(clock_time.monotonic() - started, 1)
     return summary

@@ -1,4 +1,4 @@
-"""The editable table used on Leads, Colleges and Contacts: edit cells → review → save.
+"""The editable table used on Leads, Organisations and Contacts: edit cells → review → save.
 
 Why the editor's key includes a fingerprint of the rows: Streamlit remembers edits by row *position*.
 If filters change the rows underneath, old edits would land on the wrong rows — a fresh key per set of

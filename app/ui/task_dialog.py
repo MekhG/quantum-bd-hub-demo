@@ -18,7 +18,7 @@ from app.ui.layout import nearest_time, time_options
 FLASH = "edit_flash"
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _choices() -> tuple[list[tuple[int, str]], list[str]]:
     with session_scope() as session:
         return team_users(session), loggable_types(session)
@@ -43,13 +43,13 @@ def new_task_dialog(user: CurrentUser, org_id: int | None = None, org_label: str
     owner = c3.selectbox("For", ids, format_func=dict(team).get, index=ids.index(user.id) if user.id in ids else 0)
     kind = st.selectbox("Type", types, index=types.index("Follow-up task") if "Follow-up task" in types else 0)
     if org_id is None:
-        linked = st.toggle("Link to an institution", value=False)
+        linked = st.toggle("Link to an organisation", value=False)
         if linked:
-            search = st.text_input("Institution", placeholder="Type at least 3 letters", icon=":material/search:",
+            search = st.text_input("Organisation", placeholder="Type at least 3 letters", icon=":material/search:",
                                    key="nt_search")
             with session_scope() as session:
                 matches = institution_choices(session, search)
-            org_id = st.selectbox("Pick the institution", [m[0] for m in matches], format_func=dict(matches).get,
+            org_id = st.selectbox("Pick the organisation", [m[0] for m in matches], format_func=dict(matches).get,
                                   index=0 if len(matches) == 1 else None, key=f"nt_org_{search.strip().lower()}",
                                   disabled=not matches, placeholder="Choose from the matches")
     else:
@@ -71,7 +71,7 @@ def new_task_dialog(user: CurrentUser, org_id: int | None = None, org_label: str
 @st.dialog("Hand off task")
 def hand_off_dialog(user: CurrentUser, task: dict) -> None:
     team, _ = _choices()
-    st.markdown(f"**{task['Task']}** — {task.get('Institution') or 'no institution'}")
+    st.markdown(f"**{task['Task']}** — {task.get('Organisation') or 'no organisation'}")
     others = [(uid, name) for uid, name in team if uid != task.get("owner_id")]
     target = st.selectbox("Hand it to", [uid for uid, _ in others], format_func=dict(others).get)
     note = st.text_area("Note for them", placeholder="e.g. Please send the brochure and two demo slots", height=90)

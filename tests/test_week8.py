@@ -165,8 +165,8 @@ def test_stages_are_rebuilt_for_past_weeks_and_deals(seeded: Session, world: dic
     seeded.add(deal)
     seeded.commit()
     report = build_report(seeded, WEEK, today=TODAY)
-    assert report["won"][0]["Institution"] == "Alpha University" and report["won"][0]["Value (₹)"] == 1100000
-    assert report["lost"][0]["Institution"] == "Beta Institute of Technology"
+    assert report["won"][0]["Organisation"] == "Alpha University" and report["won"][0]["Value (₹)"] == 1100000
+    assert report["lost"][0]["Organisation"] == "Beta Institute of Technology"
     tiles = {t["key"]: t["now"] for t in report["headline"]}
     assert tiles["won"] == 1 and report["totals"]["won_value"] == 1100000
 
@@ -259,10 +259,10 @@ def test_dashboard_additions_and_config_export(seeded: Session, world: dict) -> 
     beta.lost_reason_id = seeded.scalar(select(LostReason.id).limit(1))
     _move(seeded, beta, "Rejected", datetime.combine(TODAY - timedelta(days=1), time(12), tzinfo=IST))
     expiring = expiring_quotes(seeded, today=TODAY)
-    assert expiring["Institution"].tolist() == ["Alpha University"] and expiring["Value"].iloc[0] == 500000
+    assert expiring["Organisation"].tolist() == ["Alpha University"] and expiring["Value"].iloc[0] == 500000
     months = won_lost_by_month(seeded, today=TODAY)
     october = months[months["Month"] == "Oct 2026"].set_index("Outcome")["Count"]
     assert october["Won"] == 1 and october["Lost"] == 1
     assert lost_reasons(seeded)["Leads"].sum() == 1
     frames = all_config_frames(seeded)
-    assert len(frames["Signal types"]) == 11 and len(frames["News sources"]) == 15
+    assert len(frames["Signal types"]) == 12 and len(frames["News sources"]) == 15

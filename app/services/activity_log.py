@@ -87,10 +87,10 @@ def log_activity(session: Session, entry: LogEntry, user: User) -> tuple[Activit
     _require(user)
     org = session.get(Organisation, entry.org_id)
     if org is None:
-        raise LogError("Pick an institution.")
+        raise LogError("Pick an organisation.")
     lead = session.get(Lead, entry.lead_id) if entry.lead_id else None
     if lead is not None and lead.org_id != org.id:
-        raise LogError("That lead belongs to a different institution.")
+        raise LogError("That lead belongs to a different organisation.")
     if entry.direction not in ("outbound", "inbound", "internal"):
         raise LogError("Direction must be outbound, inbound or internal.")
     if entry.status not in ("done", "planned"):
@@ -98,7 +98,7 @@ def log_activity(session: Session, entry: LogEntry, user: User) -> tuple[Activit
     kind = _kind(session, entry.type_name)
     contacts = [c for c in (session.get(Contact, cid) for cid in entry.contact_ids) if c is not None]
     if any(c.org_id != org.id for c in contacts):
-        raise LogError("A chosen contact belongs to a different institution.")
+        raise LogError("A chosen contact belongs to a different organisation.")
     when = entry.when if entry.when.tzinfo else entry.when.replace(tzinfo=IST)
     messages: list[str] = []
 
@@ -274,7 +274,7 @@ def _contact_by_activity(session: Session, activity_ids: list[int]) -> dict[int,
     return out
 
 
-TASK_COLUMNS = ["activity_id", "Due", "Due by", "Time", "Bucket", "Type", "channel", "Task", "Institution",
+TASK_COLUMNS = ["activity_id", "Due", "Due by", "Time", "Bucket", "Type", "channel", "Task", "Organisation",
                 "org_id", "lead_id", "Track", "Stage", "Contact", "Designation", "Email", "Phone", "Owner", "owner_id",
                 "Cadence", "Step", "From", "Note", "Score"]
 
@@ -317,7 +317,7 @@ def task_frame(session: Session, *, owner_id: int | None, today: date | None = N
         records.append({
             "activity_id": activity.id, "Due": due, "Due by": due_by, "Time": local.strftime("%H:%M"),
             "Bucket": bucket, "Type": type_name, "channel": channel, "Task": activity.title,
-            "Institution": org_name or "", "org_id": activity.org_id, "lead_id": activity.lead_id,
+            "Organisation": org_name or "", "org_id": activity.org_id, "lead_id": activity.lead_id,
             "Track": track or "", "Stage": stage or "", "Contact": contact.name if contact else "",
             "Designation": (contact.designation or "") if contact else "",
             "Email": (contact.email or "") if contact else "", "Phone": (contact.phone or "") if contact else "",
@@ -351,12 +351,12 @@ def ghost_frame(session: Session, *, owner_id: int | None) -> pd.DataFrame:
                                          Activity.cadence_step_id.is_not(None)).exists()
         query = query.where(or_(Lead.owner_user_id == owner_id, mine))
     return pd.DataFrame(session.execute(query).all(),
-                        columns=["lead_id", "Institution", "Track", "Stage", "Cadence started", "No reply since",
+                        columns=["lead_id", "Organisation", "Track", "Stage", "Cadence started", "No reply since",
                                  "Owner"])
 
 
 def org_leads_and_contacts(session: Session, org_id: int) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
-    """For the quick-log form: this institution's leads (by track) and contacts."""
+    """For the quick-log form: this organisation's leads (by track) and contacts."""
     leads = [(lid, f"{track} · {stage}") for lid, track, stage in session.execute(
         select(Lead.id, Track.name, Stage.name).join(Track, Track.id == Lead.track_id)
         .join(Stage, Stage.id == Lead.stage_id).where(Lead.org_id == org_id).order_by(Track.sort_order))]

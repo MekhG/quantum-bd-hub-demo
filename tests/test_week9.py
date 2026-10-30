@@ -173,7 +173,7 @@ def test_participants_lead_creation_and_privacy(seeded: Session) -> None:
     track = seeded.scalar(select(Track).where(Track.code == "cold_colleges"))
     lead, note = create_lead_for_member(seeded, member_id, track.id, me)
     seeded.commit()
-    assert "New institution added: Zeta Institute of Science" in note
+    assert "New organisation added: Zeta Institute of Science" in note
     assert lead.organisation.name == "Zeta Institute of Science" and lead.source == "Community / events"
     assert seeded.get(Lead, lead.id).score == 10            # the event-participation signal was backfilled
     same, note = create_lead_for_member(seeded, member_id, track.id, me)
@@ -207,7 +207,7 @@ def test_events_validation_and_report_section(seeded: Session) -> None:
     week = community_week(seeded, monday, monday + timedelta(days=6))
     assert week["events"][0]["Event"] == "Quantum Hackathon 2026"
     assert week["new_members"] == 1 and week["members"] == 1 and week["mailable"] == 0
-    assert week["top_institutions"][0] == {"Institution": "Omega University", "Participants": 1}
+    assert week["top_institutions"][0] == {"Organisation": "Omega University", "Participants": 1}
 
 
 def test_member_directory_exports_to_excel(seeded: Session) -> None:

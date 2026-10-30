@@ -27,13 +27,13 @@ FLASH = "edit_flash"  # shared with the edit tables, shown by show_edit_flash()
 _DIRECTIONS = {"We reached out": "outbound", "They reached out": "inbound", "Internal": "internal"}
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _team() -> list[tuple[int, str]]:
     with session_scope() as session:
         return [(u.id, u.name) for u in session.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id))]
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _types() -> list[str]:
     with session_scope() as session:
         return loggable_types(session)
@@ -43,7 +43,7 @@ _SCRIPT_KIND = {"Email": "email", "Phone call": "call", "WhatsApp message": "wha
                 "LinkedIn message": "linkedin"}
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def _library_choices() -> tuple[list[tuple[int, str]], dict[str, list[tuple[int, str]]]]:
     from app.services.library import shareable_documents, usable_scripts
 
@@ -76,15 +76,15 @@ def objection_helper(key: str) -> None:
 def quick_log_dialog(user: CurrentUser, org_id: int | None = None, org_label: str | None = None,
                      lead_id: int | None = None) -> None:
     if org_id is None:
-        search = st.text_input("Institution", placeholder="Type at least 3 letters, e.g. Andhra",
+        search = st.text_input("Organisation", placeholder="Type at least 3 letters, e.g. Swarna",
                                icon=":material/search:", key="ql_search")
         with session_scope() as session:
             matches = institution_choices(session, search)
-        org_id = st.selectbox("Pick the institution", [m[0] for m in matches], format_func=dict(matches).get,
+        org_id = st.selectbox("Pick the organisation", [m[0] for m in matches], format_func=dict(matches).get,
                               index=0 if len(matches) == 1 else None, placeholder="Choose from the matches",
                               disabled=not matches, key=f"ql_org_{search.strip().lower()}")
         if search and len(search.strip()) >= 3 and not matches:
-            st.caption("Not found. Add new institutions through Import → Paste rows.")
+            st.caption("Not found. Add new organisations through Import → Paste rows.")
     else:
         st.markdown(f"**{org_label}**")
     if org_id is None:

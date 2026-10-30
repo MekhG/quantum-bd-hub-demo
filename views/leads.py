@@ -15,26 +15,34 @@ from app.services.lead_queries import frame_to_xlsx, leads_frame, stage_list
 from app.services.signals import hot_score
 from app.ui.common import require_user
 from app.ui.edit_table import edit_table
-from app.ui.layout import as_list_column, blank_missing_text, empty_state, page_header, stage_pills
+from app.ui.layout import (
+    as_list_column,
+    blank_missing_text,
+    empty_state,
+    filter_industry,
+    industry_filter,
+    page_header,
+    stage_pills,
+)
 
 user = require_user()
 FLASH = "edit_flash"
 CADENCE_FILTERS = ["Not started", *STATUS_LABELS.values()]
 
 
-@st.cache_data(ttl=60, show_spinner="Loading leads…")
+@st.cache_data(ttl=3600, show_spinner="Loading leads…")
 def load_leads() -> tuple[pd.DataFrame, pd.DataFrame]:
     with session_scope() as session:
         return leads_frame(session), stage_list(session)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_dropdowns() -> dict[str, list[str]]:
     with session_scope() as session:
         return dropdown_values(session)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_hot_score() -> int:
     with session_scope() as session:
         return hot_score(session)
@@ -66,7 +74,7 @@ if _linked and str(_linked).isdigit():
 
 head, tools = st.columns([4, 1.4], vertical_alignment="bottom")
 with head:
-    page_header("Leads", "One row per institution per track. Tick a row to open it; tick several to start "
+    page_header("Leads", "One row per organisation per track. Tick a row to open it; tick several to start "
                 "or stop cadences together.", eyebrow="Pipeline")
 with tools:
     edit_mode = st.toggle("Edit mode", key="leads_edit", disabled=not user.can("member"),
@@ -92,8 +100,9 @@ more_active = sum(bool(st.session_state.get(k)) for k in _MORE) + bool(st.sessio
     st.session_state.get("f_quiet")) + bool(st.session_state.get("f_hot"))
 
 with st.container(border=True):
+    industries = industry_filter(leads, key="f_industry")
     r1 = st.columns([2, 1.3, 1.3, 1])
-    search = r1[0].text_input("Search institution", placeholder="e.g. Andhra University",
+    search = r1[0].text_input("Search organisation", placeholder="e.g. Swarnarekha University",
                               icon=":material/search:")
     tracks = r1[1].multiselect("Track", options("Track"), placeholder="All tracks")
     stage_order = stages["name"].tolist()
@@ -103,7 +112,7 @@ with st.container(border=True):
     with st.expander(f"More filters ({more_active} on)" if more_active else "More filters"):
         r2 = st.columns(4)
         states = r2[0].multiselect("State", options("State"), key="f_states")
-        types = r2[1].multiselect("Type", options("Type"), key="f_types")
+        types = r2[1].multiselect("Organisation type", options("Type"), key="f_types")
         tiers = r2[2].multiselect("Tier", options("Tier"), key="f_tiers")
         cadence_filter = r2[3].multiselect("Cadence", CADENCE_FILTERS, key="f_cadence")
         r3 = st.columns(3)
@@ -114,12 +123,12 @@ with st.container(border=True):
         t1, t2 = st.columns(2)
         nqm_only = t1.toggle("NQM applicants only", key="f_nqm")
         hot_only = t2.toggle(f"Hot leads only (score {hot} or more)", key="f_hot",
-                             help="The score adds up the institution's signals (News & signals) and automatic "
+                             help="The score adds up the organisation's signals (News & signals) and automatic "
                                   "points: an open quote, a recent reply, a demo, the NQM flag.")
 
-view = leads
+view = filter_industry(leads, industries)
 if search:
-    view = view[view["Institution"].str.contains(search, case=False, regex=False)]
+    view = view[view["Organisation"].str.contains(search, case=False, regex=False)]
 for column, chosen in (("Track", tracks), ("Stage", stages_chosen), ("Owner", owners), ("State", states),
                        ("Type", types), ("Tier", tiers), ("Potential", potentials), ("Channel", channels)):
     if chosen:
@@ -144,14 +153,14 @@ m[1].metric("In cadence", f"{int((view['cadence_status'] == 'active').sum()):,}"
 m[2].metric("Clients", f"{int(view['Stage'].isin(won_stages).sum()):,}", border=True, icon=":material/handshake:")
 m[3].metric("NQM applicants", f"{int(view['NQM'].sum()):,}", border=True, icon=":material/flag:")
 
-columns = ["Institution", "Track", "Stage", "Score", "Cadence", "Owner", "Tier", "Potential", "Channel", "Type", "State",
-           "City", "Contacts", "Product fit", "Interest areas", "Last activity", "Next planned", "In stage since",
-           "Source", "NQM"]
+columns = ["Organisation", "Industry", "Track", "Stage", "Score", "Cadence", "Owner", "Tier", "Potential", "Channel",
+           "Type", "State", "City", "Contacts", "Product fit", "Interest areas", "Last activity", "Next planned",
+           "In stage since", "Source", "NQM"]
 
 if edit_mode:
     choices = load_dropdowns()
-    edit_columns = ["Institution", "Track", "Stage", "Owner", "Tier", "Potential", "Channel", "NQM", "Product fit",
-                    "Interest areas", "Rejected reason", "Notes", "State", "Contacts"]
+    edit_columns = ["Organisation", "Industry", "Track", "Stage", "Owner", "Tier", "Potential", "Channel", "NQM",
+                    "Product fit", "Interest areas", "Rejected reason", "Notes", "State", "Contacts"]
     grid = view.set_index("lead_id")
     grid = blank_missing_text(grid[edit_columns + ["_version"]])
     grid["Product fit"] = grid["Product fit"].map(lambda text: [t for t in str(text).split(", ") if t])
@@ -159,12 +168,13 @@ if edit_mode:
         grid=LEADS,
         frame=grid,
         columns=edit_columns,
-        label_column="Institution",
+        label_column="Organisation",
         user=user,
         key="leads_grid",
         height=min(560, 35 * (len(grid) + 1) + 3),
         column_config={
-            "Institution": st.column_config.TextColumn(pinned=True, width="large", required=True),
+            "Organisation": st.column_config.TextColumn(pinned=True, width="large", required=True),
+            "Industry": st.column_config.SelectboxColumn(options=choices.get("industry", [])),
             "Stage": st.column_config.SelectboxColumn(options=choices["stage"], required=True, width="medium"),
             "Owner": st.column_config.SelectboxColumn(options=choices["user"]),
             "Tier": st.column_config.SelectboxColumn(options=choices.get("tier", []), width="small"),
@@ -194,7 +204,7 @@ event = st.dataframe(
     selection_mode="multi-row",
     key="lead_table",
     column_config={
-        "Institution": st.column_config.TextColumn(pinned=True, width="large"),
+        "Organisation": st.column_config.TextColumn(pinned=True, width="large"),
         "Stage": stage_config,
         "Score": st.column_config.NumberColumn(format="%d", width="small",
                                                help="Signals + automatic points. Click the header to sort."),
@@ -236,7 +246,7 @@ with st.container(horizontal=True, vertical_alignment="center", gap="small"):
                     start_for(view["lead_id"].astype(int).tolist())
 
 if len(selected_ids) == 1:
-    name = view.loc[view["lead_id"] == selected_ids[0], "Institution"].iloc[0]
+    name = view.loc[view["lead_id"] == selected_ids[0], "Organisation"].iloc[0]
     with open_slot, st.container(border=True, horizontal=True, vertical_alignment="center",
                                  key="qa-card-info-open"):
         st.markdown(f"**{name}**")

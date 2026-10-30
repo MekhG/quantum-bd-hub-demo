@@ -186,7 +186,7 @@ def _quotation(user: CurrentUser) -> None:
     with st.form("quote_settings"):
         a, b, c = st.columns(3)
         prefix = a.text_input("Reference prefix", value=settings.get("quote_prefix", "DEMO"),
-                              help="References look like DEMO/KIT/2026-27/001 — prefix / institution code / "
+                              help="References look like DEMO/KIT/2026-27/001 — prefix / organisation code / "
                                    "financial year / number.")
         validity = b.number_input("Valid for (days)", min_value=1, max_value=365,
                                   value=int(settings.get("quote_validity_days") or 30))
@@ -255,7 +255,7 @@ def _checklists(user: CurrentUser) -> None:
         frame = rules_frame(session)
         routes = options(session, "buying_route")
     st.caption("Documents each buying route needs. A deal's checklist is built from these when its route is set. "
-               "'Any' rows apply to every route. Demo is not on GeM, so government institutions use the PAC "
+               "'Any' rows apply to every route. Demo is not on GeM, so government organisations use the PAC "
                "route.")
     edited = st.data_editor(
         frame, key="rules_editor", hide_index=True, width="stretch", num_rows="dynamic" if admin else "fixed",

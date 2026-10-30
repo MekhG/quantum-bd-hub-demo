@@ -29,17 +29,20 @@ from app.models.config_tables import LostReason, Product, Stage, Track
 
 USER_ROLES = ("admin", "member", "viewer")
 ORG_TYPES = (
-    "college",
-    "standalone",
+    "company",
+    "startup",
     "university",
-    "vendor",
-    "state_org",
-    "csr_company",
+    "college",
+    "standalone",  # AISHE's word for an institute outside the university system
+    "school",
+    "research_institute",
+    "government",
+    "non_profit",
     "partner",
-    "individual",  # a person with no institution (e.g. some Mini-product buyers)
+    "individual",  # a person with no organisation (e.g. some Mini-product buyers)
     "other",
 )
-# Types that make up the academic prospect pool (the raw college list).
+# Types that make up the academic prospect pool (the AISHE-style college list).
 ACADEMIC_ORG_TYPES = ("college", "standalone", "university")
 OPPORTUNITY_STATUSES = ("open", "won", "lost")
 
@@ -61,14 +64,18 @@ class Organisation(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
-    org_type: Mapped[str] = mapped_column(String(20), default="college", server_default="college")
+    org_type: Mapped[str] = mapped_column(String(20), default="company", server_default="company")
+    # Sector the organisation works in, e.g. 'Higher education', 'Telecom' (values come from option_lists, so the
+    # admin can add industries without a code change). Filters Organisations, Contacts and Leads.
+    industry: Mapped[str | None] = mapped_column(String(80), index=True)
+    state: Mapped[str | None] = mapped_column(String(60))
+    city: Mapped[str | None] = mapped_column(String(80))
+    # ---- education details (only filled for universities and colleges) ----
     # AISHE code: the government's ID for every Indian higher-education institution — the best duplicate key.
     aishe_code: Mapped[str | None] = mapped_column(String(20), unique=True)
     affiliated_university: Mapped[str | None] = mapped_column(String(255))
     # Institution quality: 'Tier 1' / 'Tier 2' / 'Tier 3' (values come from option_lists).
     tier: Mapped[str | None] = mapped_column(String(20))
-    state: Mapped[str | None] = mapped_column(String(60))
-    city: Mapped[str | None] = mapped_column(String(80))
     # 'Rural' / 'Urban' from the AISHE list.
     area: Mapped[str | None] = mapped_column(String(20))
     # Who runs it: 'State Government', 'Central Government', 'Private Un-Aided'… Government
@@ -78,6 +85,7 @@ class Organisation(TimestampMixin, Base):
     category: Mapped[str | None] = mapped_column(String(80))
     # Which raw lists the institution appeared in, comma-separated (e.g. 'Vidyalaxmi, Rural list').
     source_lists: Mapped[str | None] = mapped_column(Text)
+    # ---- every organisation ----
     website: Mapped[str | None] = mapped_column(String(255))
     # Email/web domain (e.g. 'iitb.ac.in') is the next-best duplicate key after AISHE code.
     domain: Mapped[str | None] = mapped_column(String(255), index=True)

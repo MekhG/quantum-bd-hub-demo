@@ -67,7 +67,7 @@ def test_edit_lead_and_institution_fields(seeded: Session) -> None:
     edited.at[lead.id, "Tier"] = "Tier 1"
     edited.at[lead.id, "Potential"] = "50-70%"
     edited.at[lead.id, "Product fit"] = ["NetSim Q", "QSim Cluster"]
-    plan = plan_edits(LEADS, original, edited, "Institution")
+    plan = plan_edits(LEADS, original, edited, "Organisation")
     assert {c for e in plan.edits for c in e.values} == {"Stage", "Tier", "Potential", "Product fit"}
 
     result = apply_plan(seeded, plan, versions, _user(seeded, "member"))
@@ -91,13 +91,13 @@ def test_rejected_needs_a_reason(seeded: Session) -> None:
     original, versions = _grid(leads_frame(seeded), "lead_id")
     edited = original.copy()
     edited.at[lead.id, "Stage"] = "Rejected"
-    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Institution"), versions,
+    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Organisation"), versions,
                         _user(seeded, "member"))
     assert result.saved_rows == 0 and "Rejected reason" in result.errors[0]
     seeded.rollback()
 
     edited.at[lead.id, "Rejected reason"] = "Budget"
-    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Institution"), versions,
+    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Organisation"), versions,
                         _user(seeded, "member"))
     seeded.commit()
     seeded.refresh(lead)
@@ -110,7 +110,7 @@ def test_conflicting_edit_is_skipped(seeded: Session) -> None:
     versions[lead.id] = "stale-version"  # as if someone saved this row after we loaded the table
     edited = original.copy()
     edited.at[lead.id, "Potential"] = "70-90%"
-    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Institution"), versions,
+    result = apply_plan(seeded, plan_edits(LEADS, original, edited, "Organisation"), versions,
                         _user(seeded, "member"))
     assert result.saved_rows == 0 and "changed by someone else" in result.conflicts[0]
 

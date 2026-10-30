@@ -37,16 +37,23 @@ from app.services.versions import version_series  # noqa: E402
 IST = ZoneInfo("Asia/Kolkata")
 
 ORG_TYPE_LABELS = {
-    "college": "College",
-    "standalone": "Standalone",
+    "company": "Company",
+    "startup": "Startup",
     "university": "University",
-    "vendor": "Vendor",
-    "state_org": "State org",
-    "csr_company": "Company or foundation",
+    "college": "College",
+    "standalone": "Standalone institute",
+    "school": "School",
+    "research_institute": "Research institute",
+    "government": "Government body",
+    "non_profit": "Non-profit",
     "partner": "Partner",
     "individual": "Individual",
     "other": "Other",
 }
+
+
+# People with no organisation (e.g. a student buying a Mini licence) show under this in the Industry filter.
+INDIVIDUALS = "Individuals"
 
 
 def _ist(value: Any) -> Any:
@@ -74,8 +81,9 @@ def leads_frame(session: Session) -> pd.DataFrame:
     query = (
         select(
             Lead.id.label("lead_id"),
-            Organisation.name.label("Institution"),
+            Organisation.name.label("Organisation"),
             Organisation.org_type,
+            Organisation.industry.label("Industry"),
             Organisation.state.label("State"),
             Organisation.city.label("City"),
             Organisation.tier.label("Tier"),
@@ -125,6 +133,8 @@ def leads_frame(session: Session) -> pd.DataFrame:
     )
     fit_text = fits.groupby("lead_id")["product"].agg(", ".join) if not fits.empty else pd.Series(dtype=str)
     frame["Product fit"] = frame["lead_id"].map(fit_text).fillna("")
+    frame["Industry"] = frame["Industry"].mask(frame["Industry"].isna() & (frame["org_type"] == "individual"),
+                                               INDIVIDUALS)
     frame["Type"] = frame.pop("org_type").map(ORG_TYPE_LABELS)
     frame["_version"] = version_series(frame.pop("_lead_updated"), frame.pop("_org_updated"))
     totals = steps_per_track(session)
@@ -245,13 +255,15 @@ def lead_detail(session: Session, lead_id: int) -> dict[str, Any] | None:
     }
 
 
-def colleges_frame(session: Session) -> pd.DataFrame:
+def organisations_frame(session: Session) -> pd.DataFrame:
+    """Every organisation (people saved as individuals aside) with its tracks and contact count."""
     orgs = pd.DataFrame(
         session.execute(
             select(
                 Organisation.id.label("org_id"),
                 Organisation.name.label("Name"),
                 Organisation.org_type,
+                Organisation.industry.label("Industry"),
                 Organisation.aishe_code.label("AISHE Code"),
                 Organisation.state.label("State"),
                 Organisation.city.label("Location"),
@@ -263,8 +275,8 @@ def colleges_frame(session: Session) -> pd.DataFrame:
                 Organisation.category.label("Category"),
                 Organisation.source_lists.label("Lists"),
                 Organisation.updated_at.label("_updated"),
-            ).where(Organisation.org_type.in_(ACADEMIC_ORG_TYPES))
-            .order_by(Organisation.state, Organisation.name)
+            ).where(Organisation.org_type != "individual")
+            .order_by(Organisation.name)
         ).mappings().all()
     )
     if orgs.empty:
@@ -282,29 +294,33 @@ def colleges_frame(session: Session) -> pd.DataFrame:
     orgs["Contacts"] = orgs["org_id"].map(contacts.set_index("org_id")["n"] if not contacts.empty else {}).fillna(0)
     orgs["Contacts"] = orgs["Contacts"].astype(int)
     orgs["Type"] = orgs.pop("org_type").map(ORG_TYPE_LABELS)
+    orgs["Education"] = orgs["Type"].isin([ORG_TYPE_LABELS[t] for t in ACADEMIC_ORG_TYPES])
     orgs["_version"] = version_series(orgs.pop("_updated"))
     return orgs
+
+
+colleges_frame = organisations_frame  # the page used to be called Colleges
 
 
 # The team's tracker columns, in their order, so a research batch drops straight into the AI workflow
 # and imports back without any column changes.
 RESEARCH_COLUMNS = [
-    "Owner", "Status", "Tier", "Potential", "Location", "Type (College/ Standalone/University)",
-    "Institution Name", "Contact Name", "Email Id", "Contact Number", "Contact Type", "Department",
-    "Faculty Research Interests (If Faculty)", "Product Fit (If any)", "Channel",
-    "AISHE Code", "Website", "State", "University Name",
+    "Owner", "Status", "Tier", "Potential", "Location", "Type", "Organisation Name", "Industry", "Contact Name",
+    "Email Id", "Contact Number", "Contact Type", "Department", "Faculty Research Interests (If Faculty)",
+    "Product Fit (If any)", "Channel", "AISHE Code", "Website", "State", "University Name",
 ]
 
 
-def research_sheet(colleges: pd.DataFrame) -> bytes:
+def research_sheet(organisations: pd.DataFrame) -> bytes:
     rows = []
-    for _, c in colleges.iterrows():
+    for _, c in organisations.iterrows():
         location = ", ".join(x for x in [c.get("Location"), c.get("State")] if isinstance(x, str) and x)
         rows.append({
             "Tier": c.get("Tier") or "",
             "Location": location,
-            "Type (College/ Standalone/University)": c.get("Type") or "",
-            "Institution Name": c["Name"],
+            "Type": c.get("Type") or "",
+            "Organisation Name": c["Name"],
+            "Industry": c.get("Industry") or "",
             "AISHE Code": c.get("AISHE Code") or "",
             "Website": c.get("Website") or "",
             "State": c.get("State") or "",
@@ -367,13 +383,15 @@ def stage_list(session: Session) -> pd.DataFrame:
 
 
 def contacts_frame(session: Session) -> pd.DataFrame:
-    """Every contact with its institution and the tracks that institution is a lead in."""
+    """Every contact with its organisation and the tracks that organisation is a lead in."""
     frame = pd.DataFrame(
         session.execute(
             select(
                 Contact.id.label("contact_id"),
                 Contact.name.label("Name"),
-                Organisation.name.label("Institution"),
+                Organisation.name.label("Organisation"),
+                Organisation.industry.label("Industry"),
+                Organisation.org_type.label("org_type"),
                 Organisation.state.label("State"),
                 Contact.contact_type.label("Contact type"),
                 Contact.designation.label("Designation"),
@@ -403,6 +421,9 @@ def contacts_frame(session: Session) -> pd.DataFrame:
     )
     track_text = tracks.groupby("org_id")["track"].agg(", ".join) if not tracks.empty else pd.Series(dtype=str)
     frame["Tracks"] = frame["org_id"].map(track_text).fillna("")
+    frame["Industry"] = frame["Industry"].mask(frame["Industry"].isna() & (frame["org_type"] == "individual"),
+                                               INDIVIDUALS)
+    frame["Org type"] = frame.pop("org_type").map(ORG_TYPE_LABELS)
     frame["_version"] = version_series(frame.pop("_updated"))
     frame["Added"] = frame["Added"].map(_ist)
     return frame
@@ -422,12 +443,12 @@ def audit_frame(session: Session, limit: int = 500, entity: str | None = None,
         query = query.where(AuditLog.entity == entity)
     if entity_ids:
         query = query.where(AuditLog.entity_id.in_(entity_ids))
-    names = {"leads": "Lead", "organisations": "Institution", "contacts": "Contact"}
+    names = {"leads": "Lead", "organisations": "Organisation", "contacts": "Contact"}
     rows = []
     for log, who in session.execute(query):
         diff = log.diff or {}
         what = names.get(log.entity, log.entity)
-        label = diff.get("name") or diff.get("Name") or diff.get("Institution", [None, None])
+        label = diff.get("name") or diff.get("Name") or diff.get("Organisation", [None, None])
         if log.action == "update":
             for field_name, change in diff.items():
                 old, new = (change + [None, None])[:2] if isinstance(change, list) else (None, change)

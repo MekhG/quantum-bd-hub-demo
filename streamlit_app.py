@@ -48,7 +48,7 @@ SECTIONS: dict[str, list[st.Page]] = {
         st.Page("views/leads.py", title="Leads", icon=":material/target:"),
         st.Page("views/quotes.py", title="Quotes", icon=":material/request_quote:"),
         st.Page("views/contacts.py", title="Contacts", icon=":material/contacts:"),
-        st.Page("views/colleges.py", title="Colleges", icon=":material/account_balance:"),
+        st.Page("views/organisations.py", title="Organisations", icon=":material/domain:"),
         st.Page("views/partners.py", title="Partners", icon=":material/handshake:"),
         st.Page("views/clients.py", title="Clients", icon=":material/verified:"),
     ],
@@ -76,15 +76,61 @@ SECTIONS: dict[str, list[st.Page]] = {
 
 
 
-@st.cache_resource(show_spinner="Preparing today's demo data — about 20 seconds, once a day…")
-def _demo_data_ready(day: str) -> str:
-    """Once per day per server: rebuild the fictional data so it always ends today (and visitors' edits reset)."""
+def _start_demo_data() -> None:
+    """Never waits: builds today's fictional data in the background if it isn't there yet. Visitors keep using
+    yesterday's until it's swapped in; the data rebuilds daily so it always ends today and edits reset."""
     from app.db import reset_engine
-    from app.demo.refresh import ensure_fresh
+    from app.demo.refresh import start_refresh
 
-    if ensure_fresh(on_swap=reset_engine):
+    start_refresh(on_swap=reset_engine)
+
+
+def _wait_for_first_data() -> None:
+    """Only on a brand-new server (nothing to show yet): a progress bar until the first build is done."""
+    from app.demo import refresh
+
+    if refresh.has_data():
+        return
+    from app.ui.components import inject_css
+    from app.ui.layout import page_header
+
+    inject_css()
+    st.session_state["_qa_page_icon"] = ":material/hourglass_top:"
+    holder = st.empty()
+    with holder.container():
+        page_header("Preparing the demo data",
+                    "The app has just woken up, so it is writing twelve weeks of fictional BD work. This happens "
+                    "once; after that every page opens straight away.", eyebrow="One moment")
+        bar = st.progress(0.0)
+        while refresh.is_building() and not refresh.has_data():
+            elapsed = refresh.seconds_building()
+            done = min(elapsed / refresh.TYPICAL_BUILD_SECONDS, 0.95)
+            left = max(int(refresh.TYPICAL_BUILD_SECONDS - elapsed), 1)
+            bar.progress(done, text=f"About {left} seconds left…" if done < 0.95 else "Almost there…")
+            refresh.wait_for_data(0.5)
+    if not refresh.has_data():
+        st.error("The demo data couldn't be built. Reload the page to try again.")
+        if refresh.build_error():
+            with st.expander("Details"):
+                st.code(refresh.build_error())
+        st.stop()
+    holder.empty()
+    st.rerun()
+
+
+@st.cache_resource
+def _seen_generation() -> dict[str, int]:
+    return {"value": 0}
+
+
+def _clear_caches_after_saves() -> None:
+    """Pages cache their tables for up to an hour; any save (or a fresh day's data) clears every cache once."""
+    from app.db import data_generation
+
+    seen, now = _seen_generation(), data_generation()
+    if seen["value"] != now:
         st.cache_data.clear()
-    return day
+        seen["value"] = now
 
 
 def _has_visitor() -> bool:
@@ -96,13 +142,14 @@ def _has_visitor() -> bool:
     return chosen_email() is not None
 
 
+if is_demo():
+    _start_demo_data()  # first thing on every run, so a sleeping app starts building while the welcome page shows
 current = st.navigation(SECTIONS, position="top" if _has_visitor() else "hidden")
 st.session_state["_qa_page_icon"] = current.icon
 st.set_page_config(page_title=f"{current.title} · Demo BD Hub")
-if is_demo():
-    from app.demo.refresh import today_ist
-
-    _demo_data_ready(today_ist().isoformat())
+if is_demo() and _has_visitor():
+    _wait_for_first_data()
+_clear_caches_after_saves()
 user = authenticate()
 if is_demo() and user.role == "viewer" and current.title == "Today" and not st.session_state.get("viewer_landed"):
     # Leadership has no tasks: their first page is the Dashboard.
@@ -110,8 +157,12 @@ if is_demo() and user.role == "viewer" and current.title == "Today" and not st.s
     st.switch_page(SECTIONS["Overview"][2])
 counts = load_shell_counts(user.id, user.name)
 if is_demo():
-    st.html('<div class="qa-demo-banner"><b>Live demo</b> · Demo is a fictional company — every institution, person '
-            'and number is made up. The data rebuilds daily, so try anything.</div>')
+    from app.demo.refresh import is_building, is_fresh
+
+    note = (" Today's data is on its way — you're seeing yesterday's for a minute." if is_building() and not is_fresh()
+            else " The data rebuilds daily, so try anything.")
+    st.html('<div class="qa-demo-banner"><b>Live demo</b> · Demo is a fictional company — every organisation, '
+            f'person and number is made up.{note}</div>')
 render_shell(user, counts)
 show_edit_flash()  # result of the last save / log, shown at the top of whichever page is open
 current.run()

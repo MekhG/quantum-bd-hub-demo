@@ -549,13 +549,13 @@ TEMPLATES: dict[str, str] = {
 > How Demo works with partners (a fictional example)
 hub: Demo [simulators · kits · support]
   - Reseller [sells in its region from a partner price list]
-  - Referral partner [introduces institutions · referral fee]
+  - Referral partner [introduces organisations · referral fee]
   - Training partner [runs workshops on our platforms]
   - EdTech platform [lists our simulators in its catalogue]""",
     "reseller": """# Reseller model
 > Who does what in a reseller sale (a fictional example)
 ## The sale
-Demo [partner price list] -> Reseller [quotes and invoices the institution] -> Institution [issues the purchase order]
+Demo [partner price list] -> Reseller [quotes and invoices the organisation] -> Organisation [issues the purchase order]
 note: Deal registration shows any overlap before a reseller starts.
 ## After the order
 Delivery by Demo -> Installation and training -> Warranty and support
@@ -568,7 +568,7 @@ note: A caption under the flow""",
 }
 
 
-# ---------------------------------------------------------------- institute categories compared
+# ---------------------------------------------------------------- segments compared (industry, public/private…)
 
 
 # Fixed colour per category (validated palette; "Not set" stays grey), so a filter never repaints a category.
@@ -576,20 +576,29 @@ CATEGORY_COLOURS = {"Public · Urban": "#8B5A2B", "Public · Rural": "#2F7F7A", 
                     "Private · Rural": "#7C5CE6", "Public": "#8B5A2B", "Private": "#16A34A", "Urban": "#8B5A2B",
                     "Rural": "#2F7F7A"}
 SEGMENT_METRICS = ("Leads", "Contacted", "Replied", "Demos", "Quotes sent", "Won", "Won value (₹)", "Win rate")
-GROUPINGS = {"Public / private × urban / rural": "both", "Public / private": "sector", "Urban / rural": "area"}
+GROUPINGS = {"Industry": "industry", "Public / private × urban / rural": "both", "Public / private": "sector",
+             "Urban / rural": "area"}
+TOP_INDUSTRIES = 6  # the rest are added up as "Other industries", so the charts stay readable
 
 
 def segment_comparison(session: Session, start: date, end: date, grouping: str = "both") -> pd.DataFrame:
-    """Institute categories compared over [start, end]: leads (all, now), and what happened in the period."""
+    """Segments compared over [start, end] — by industry, or education's public/private and urban/rural: leads
+    (all, now), and what happened in the period."""
     from app.services.report_metrics import _demos, _replies, _quotes_sent, area_of, sector_of, touches
 
     leads = pd.DataFrame(session.execute(
-        select(Lead.id, Organisation.management, Organisation.area)
-        .join(Organisation, Organisation.id == Lead.org_id)).all(), columns=["lead_id", "management", "area"])
+        select(Lead.id, Organisation.management, Organisation.area, Organisation.industry, Organisation.org_type)
+        .join(Organisation, Organisation.id == Lead.org_id)).all(),
+        columns=["lead_id", "management", "area", "industry", "org_type"])
     if leads.empty:
         return pd.DataFrame(columns=["Category", *SEGMENT_METRICS])
+    industry = leads["industry"].mask(leads["industry"].isna() & (leads["org_type"] == "individual"), "Individuals")
+    industry = industry.fillna("Not set")
+    biggest = list(industry[industry != "Not set"].value_counts().index[:TOP_INDUSTRIES])
 
-    def name(m, a):
+    def name(m, a, i):
+        if grouping == "industry":
+            return i if i in biggest or i in ("Not set", "Individuals") else "Other industries"
         if grouping == "sector":
             return sector_of(m)
         if grouping == "area":
@@ -597,7 +606,7 @@ def segment_comparison(session: Session, start: date, end: date, grouping: str =
         sector, area = sector_of(m), area_of(a)
         return "Not set" if sector == area == "Not set" else f"{sector} · {area}"
 
-    leads["Category"] = [name(m, a) for m, a in zip(leads["management"], leads["area"])]
+    leads["Category"] = [name(m, a, i) for m, a, i in zip(leads["management"], leads["area"], industry)]
     category = leads.set_index("lead_id")["Category"]
     s_dt = datetime.combine(start, time(0), tzinfo=IST)
     e_dt = datetime.combine(end + timedelta(days=1), time(0), tzinfo=IST)
@@ -622,7 +631,8 @@ def segment_comparison(session: Session, start: date, end: date, grouping: str =
     won_value = (won.assign(c=won["lead_id"].map(category), v=won["value"].astype(float).fillna(0))
                  .groupby("c")["v"].sum()) if not won.empty else pd.Series(dtype=float)
     order = {"both": ["Public · Urban", "Public · Rural", "Private · Urban", "Private · Rural"],
-             "sector": ["Public", "Private"], "area": ["Urban", "Rural"]}[grouping]
+             "sector": ["Public", "Private"], "area": ["Urban", "Rural"],
+             "industry": [*biggest, "Other industries"]}[grouping]
     names = order + sorted(c for c in leads["Category"].unique() if c not in order)
     rows = []
     for c in names:
@@ -664,6 +674,10 @@ def comparison_chart(frame: pd.DataFrame, metrics: list[str], title: str, fmt: s
         ax.set_title(metric, fontsize=10, loc="left", color=INK)
         ax.spines[["top", "right"]].set_visible(False)
         ax.tick_params(axis="x", labelsize=8, length=0)
+        if len(categories) > 4:  # industry names are long: slant them so they don't overlap
+            ax.tick_params(axis="x", labelrotation=30)
+            for tick in ax.get_xticklabels():
+                tick.set_horizontalalignment("right")
         ax.tick_params(axis="y", labelsize=7, colors=MUTED)
         ax.grid(axis="y", color="#EDE3D6", linewidth=0.8)
         ax.set_axisbelow(True)
