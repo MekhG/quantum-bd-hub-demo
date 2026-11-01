@@ -3,10 +3,10 @@
 **One app for a small business-development team: leads, follow-ups, every conversation, quotes, partners,
 marketing and the weekly leadership report, in one place instead of a dozen spreadsheets.**
 
-[![Live demo](https://img.shields.io/badge/Live_demo-Streamlit-7A4A26?logo=streamlit&logoColor=white)](#live-demo)
+![Streamlit](https://img.shields.io/badge/Streamlit-app-7A4A26?logo=streamlit&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.12-2B1C10?logo=python&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2-8B5A2B)
-![Tests](https://img.shields.io/badge/tests-178_passing-2F5E2A)
+[![Tests](https://github.com/MekhG/quantum-bd-hub-demo/actions/workflows/tests.yml/badge.svg)](https://github.com/MekhG/quantum-bd-hub-demo/actions/workflows/tests.yml)
 ![License](https://img.shields.io/badge/license-MIT-C2873C)
 
 I built this hub for the academia team of a deep-tech company that sells quantum teaching labs (simulators and
@@ -38,11 +38,9 @@ organisations, contacts and prices are fictional, and the data rebuilds itself e
 | **Reporting** | Dashboard by Indian financial year; a weekly leadership report with targets that freezes when finalised and downloads as Word and Excel. |
 | **Privacy (DPDP Act)** | Find every record for an email, export it, stop contact or delete everywhere, with a 30-day due date and a one-way hash that keeps deleted people out of later imports. |
 
-## Live demo
+## Try the demo
 
-**Live demo:** _add your Streamlit link here_
-
-Pick a persona on the welcome page and click anything; nothing you change survives the daily rebuild.
+[Run it locally](#run-it-locally) (about a minute), then pick a persona on the welcome page and click anything; nothing you change survives the daily rebuild.
 
 | Persona | Role | Try this |
 |---|---|---|
@@ -84,7 +82,7 @@ flowchart LR
 | Data | **SQLAlchemy 2** models, **Alembic** migrations, Postgres (Supabase) in production, SQLite here | The data model is the backbone and would survive a future React front end |
 | Configuration as data | Tracks, cadences, stages, activity types, industries, products, prices and signal weights are rows in tables | The team changes its process without a developer |
 | Documents | **python-docx**, **openpyxl**, **matplotlib** | Leadership gets Word and Excel files, not screenshots |
-| Quality | **178 pytest checks**, including guards that the demo contains no real names, emails, phone numbers or business terms | Safe to publish |
+| Quality | **178 pytest checks** run on every push (GitHub Actions), including guards that the demo contains no real names, emails, phone numbers or business terms | Safe to publish |
 
 ### Engineering highlights
 
